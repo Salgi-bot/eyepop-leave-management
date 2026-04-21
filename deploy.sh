@@ -57,20 +57,28 @@ fi
 
 # 6. 배포 성공 알림 (텔레그램)
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://$SITE_NAME.netlify.app/")
-BOT_TOKEN="***REDACTED-OLD-TOKEN***"
-CHAT_ID="8152882784"
-if [ "$STATUS" = "200" ]; then
-  curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-    -d "chat_id=${CHAT_ID}" \
-    --data-urlencode "text=✅ 연차관리 앱 자동 배포 완료 ($(date '+%Y-%m-%d %H:%M'))
+
+# 텔레그램 토큰은 secrets 파일에서 로드 (하드코딩 금지)
+if [ -z "$TELEGRAM_BOT_TOKEN" ] && [ -f "$SECRET_FILE" ]; then
+  source "$SECRET_FILE"
+fi
+
+if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+  if [ "$STATUS" = "200" ]; then
+    curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+      -d "chat_id=${TELEGRAM_CHAT_ID}" \
+      --data-urlencode "text=✅ 연차관리 앱 자동 배포 완료 ($(date '+%Y-%m-%d %H:%M'))
 URL: https://${SITE_NAME}.netlify.app" > /dev/null
-  echo "  → 배포 성공 ✅ (HTTP 200)" | tee -a "$LOG"
-else
-  curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-    -d "chat_id=${CHAT_ID}" \
-    --data-urlencode "text=❌ 연차관리 앱 배포 실패 (HTTP ${STATUS})
+    echo "  → 배포 성공 ✅ (HTTP 200)" | tee -a "$LOG"
+  else
+    curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+      -d "chat_id=${TELEGRAM_CHAT_ID}" \
+      --data-urlencode "text=❌ 연차관리 앱 배포 실패 (HTTP ${STATUS})
 로그: ${LOG}" > /dev/null
-  echo "  → 배포 실패 ❌ (HTTP $STATUS)" | tee -a "$LOG"
+    echo "  → 배포 실패 ❌ (HTTP $STATUS)" | tee -a "$LOG"
+  fi
+else
+  echo "  → 텔레그램 토큰 없음, 알림 생략 (HTTP $STATUS)" | tee -a "$LOG"
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 배포 완료" | tee -a "$LOG"
