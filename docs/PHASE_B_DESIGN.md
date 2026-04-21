@@ -422,6 +422,156 @@ function calcRemaining(employee, requests) {
 
 ---
 
+## 12-A. SECOM 출퇴근 대조 기능 [추가 요구사항]
+
+### 12-A.1 기능 개요
+관리자가 **SECOM(세콤) 출퇴근 기록 엑셀 파일**을 업로드하면, 앱에 등록된 **연차 사용계획**과 자동 대조하여 **일치·불일치 리포트**를 생성한다.
+
+### 12-A.2 사용 시나리오
+1. 관리자 대시보드 → **"출퇴근 대조"** 탭 신설
+2. "SECOM 엑셀 업로드" 버튼 클릭 → 파일 선택
+3. 기간 선택 (기본: 현재 연도 1/1~오늘)
+4. 자동 파싱 → 매일 출근 여부 확인
+5. 연차 신청과 매칭 → 리포트 출력
+
+### 12-A.3 리포트 출력 예시
+```
+✅ 일치: 홍길동 — 2026-05-20(연차 신청) + SECOM 미출근  →  OK
+⚠️ 불일치: 김철수 — 2026-05-15(연차 신청) + SECOM 출근기록 있음  →  확인 필요
+⚠️ 불일치: 이영희 — 2026-05-10(SECOM 미출근) + 연차 신청 없음  →  무단결근 or 신청누락
+📊 요약: 전체 87건 중 일치 82건 / 불일치 5건 (5.7%)
+```
+
+### 12-A.4 SECOM 엑셀 파일 파싱
+- 필수 컬럼 (샘플 확인 후 확정):
+  - 이름 (또는 사번)
+  - 날짜
+  - 출근 시각 / 퇴근 시각
+  - 출근 상태 (정상·지각·결근 등)
+- SheetJS로 파싱 → 각 직원별 날짜 맵 생성
+
+### 12-A.5 대조 로직
+```js
+function compare(secomRecords, leaveRequests) {
+  const report = [];
+  for (const emp of employees) {
+    for (const day of dateRange(from, to)) {
+      const secomAttended = hasSecomRecord(emp, day);
+      const leaveApplied  = hasApprovedLeave(emp, day);
+      
+      if (leaveApplied && !secomAttended) report.push({emp, day, status: "일치"});
+      if (leaveApplied && secomAttended) report.push({emp, day, status: "⚠️ 신청했는데 출근"});
+      if (!leaveApplied && !secomAttended) report.push({emp, day, status: "⚠️ 미출근·미신청"});
+    }
+  }
+  return report;
+}
+```
+
+### 12-A.6 저장·보관
+- 업로드한 SECOM 파일: Gist에 **저장 안 함** (개인정보 최소화)
+- 대조 결과 리포트만 요약 형태로 `comparison-history.json`에 저장
+  - 일시·기간·일치/불일치 건수만
+
+---
+
+## 12-B. 연차 촉진 알림 + 팝업 [추가 요구사항]
+
+### 12-B.1 법적 근거
+- 근로기준법 제61조 (연차 사용 촉진)
+- 1차 촉구: 사용기간 종료 **6개월 전 기준 10일 이내** (통상 매년 7/1~10)
+- 2차 통보: 사용기간 종료 **2개월 전까지** (통상 매년 10/31까지)
+
+### 12-B.2 시기 자동 감지
+`settings.json`에 연차 회계연도 설정 추가:
+```json
+{
+  "leaveFiscalYear": { "startMonth": 1, "endMonth": 12 },
+  "promotion1stDate": "07-01",
+  "promotion2ndDate": "10-31"
+}
+```
+
+앱 시작 시 시스템 날짜 확인:
+- 7/1~7/10 → 1차 촉진 팝업 트리거
+- 10/20~10/31 → 2차 촉진 팝업 트리거
+- 관리자 메뉴에서 기간 커스터마이징 가능
+
+### 12-B.3 관리자 전용 이메일 알림 (팝업 아님)
+
+**통지 방식: 김은주 차장 eunju@eyepopeng.com 자동 이메일 발송**
+(직원에게는 노출되지 않음, 관리자만 수신)
+
+```
+발신: 연차관리 <noreply@eyepopeng.com>
+수신: 김은주 차장 <eunju@eyepopeng.com>
+제목: [관리자] 연차 사용 촉진 1차 통지 시기 도래 (2026-07-01)
+
+안녕하세요, 김은주 차장님.
+
+오늘은 2026년 1차 연차 사용 촉진 기간 시작일입니다.
+근로기준법 제61조에 따라 다음 조치가 필요합니다.
+
+☐ 1. SECOM 출퇴근 파일 대조 확인
+     https://eyepop-leave-management.netlify.app/admin#compare
+
+☐ 2. 미사용 연차 현황 조회
+     https://eyepop-leave-management.netlify.app/admin#unused
+
+☐ 3. 대상 직원 촉진 안내 메일 일괄 발송
+     https://eyepop-leave-management.netlify.app/admin#promotion
+
+[일괄 업무 시작하기]
+→ https://eyepop-leave-management.netlify.app/admin#promotion-1st
+
+※ 2차 통지는 2026-10-31까지 완료되어야 합니다.
+```
+
+### 12-B.4 관리자 대시보드 배너 (보조)
+
+이메일이 주 통지, 로그인 시 상단 배너로 재안내:
+```
+┌──────────────────────────────────────────────────┐
+│ ⚠️  연차 촉진 1차 통지 기간 (2026-07-01 ~ 07-10) │
+│    [업무 시작]  [오늘은 숨기기]                      │
+└──────────────────────────────────────────────────┘
+```
+- 관리자만 표시 (일반 직원 로그인 화면엔 없음 — Phase B에서 관리자 구분 기본이므로 자동 차단)
+- 비관리자 페이지(신청 폼)에는 절대 표시 안 됨
+
+### 12-B.5 법정 서식 촉진 이메일
+자동 생성 (근로개선정책과-5353 기준 요건 충족):
+- 제목: `[연차 사용 촉진] {이름}님 미사용 연차 {X}일 — 사용시기 회신 요청`
+- 본문에 **개인별 미사용 일수**·**사용기간 종료일**·**회신 기한**·**미사용 시 수당 미지급 안내** 포함
+- 수신확인 토큰 포함 (30일 유효)
+
+### 12-B.6 촉진 기록 저장
+`promotions.json` 신규:
+```json
+{
+  "promotions": [
+    {
+      "id": "promo-2026-001",
+      "year": 2026,
+      "phase": "first",
+      "sentAt": "2026-07-01T10:00:00+09:00",
+      "targetEmployees": ["e001", "e005", "e012"],
+      "template": "first-notice",
+      "confirmations": [
+        {"employeeId": "e001", "confirmedAt": "2026-07-02T09:30:00+09:00"}
+      ]
+    }
+  ]
+}
+```
+
+### 12-B.7 관리자 대시보드 촉진 탭 신설
+- 연도·촉진회차별 이력
+- 각 직원 응답 상태 (미확인·확인·회신완료)
+- 재발송·수기통보 기록
+
+---
+
 ## 13. Phase C~E 예고
 
 | Phase | 범위 |
