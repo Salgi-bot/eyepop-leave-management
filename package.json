@@ -1,0 +1,13 @@
+{
+  "name": "eyepop-leave-management",
+  "version": "0.1.0",
+  "description": "아이팝엔지니어링 연차관리 앱",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "dev": "netlify dev",
+    "deploy": "netlify deploy --prod"
+  }
+}

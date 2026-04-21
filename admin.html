@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>관리자 대시보드 — EYEPOP 연차관리</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-logo">
+        EYEPOP 연차관리 <small>관리자 대시보드 · Phase A</small>
+      </div>
+      <div class="topbar-actions">
+        <button id="btnLogout">로그아웃</button>
+      </div>
+    </header>
+
+    <div class="main-area">
+      <nav class="sidebar" id="sidebar">
+        <button class="sidebar-item active" data-tab="employees">직원관리</button>
+        <button class="sidebar-item" data-tab="requests">신청내역</button>
+        <button class="sidebar-item" data-tab="settings">설정</button>
+      </nav>
+
+      <section class="content">
+        <!-- 직원관리 탭 -->
+        <div class="tab-panel" id="tab-employees">
+          <h2>직원관리</h2>
+          <div class="card">
+            <div class="action-row">
+              <button class="btn-primary" id="btnUploadExcel">엑셀 업로드</button>
+              <input type="file" id="fileExcel" accept=".xlsx,.xls" class="hidden">
+              <button class="btn-secondary" id="btnDownloadTemplate">샘플 엑셀 다운로드</button>
+              <button class="btn-secondary" id="btnAddEmployee">+ 개별 추가</button>
+              <input type="text" id="searchInput" placeholder="이름/이메일/부서 검색">
+              <select id="deptFilter">
+                <option value="">전체 부서</option>
+              </select>
+            </div>
+            <div id="employeeTableWrap">
+              <div class="empty-state">직원 데이터가 없습니다. 엑셀을 업로드해주세요.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 신청내역 탭 -->
+        <div class="tab-panel hidden" id="tab-requests">
+          <h2>신청내역</h2>
+          <div class="phase-notice">
+            <strong>Phase B에서 구현 예정입니다.</strong><br>
+            직원 연차 신청, 팀장 승인, 이의 제기, 이메일 알림 기능이 이 탭에서 제공됩니다.
+          </div>
+        </div>
+
+        <!-- 설정 탭 -->
+        <div class="tab-panel hidden" id="tab-settings">
+          <h2>설정</h2>
+          <div class="card">
+            <div class="settings-row">
+              <div class="settings-label">이의 제기 기간 (일)</div>
+              <div>
+                <input type="number" id="objectionPeriod" min="1" max="30" style="width: 100px;">
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label">승인 방식</div>
+              <div class="toggle-group" id="approvalToggle" data-field="approvalMode">
+                <button data-value="auto">자동 승인</button>
+                <button data-value="manual">수동 승인</button>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label">연차 산정 방식</div>
+              <div class="toggle-group" id="leaveCalcToggle" data-field="leaveCalcMode">
+                <button data-value="legal">법정 자동</button>
+                <button data-value="custom">임의 지정</button>
+              </div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label">발신자 이메일</div>
+              <div><input type="email" id="emailSender" style="width: 280px;"></div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label">관리자 이메일</div>
+              <div><input type="email" id="adminEmail" style="width: 280px;"></div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-label">부사장 이메일</div>
+              <div><input type="email" id="vicePresidentEmail" style="width: 280px;"></div>
+            </div>
+
+            <div style="text-align: right; margin-top: 16px;">
+              <button class="btn-primary" id="btnSaveSettings">저장</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/gist-client.js"></script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

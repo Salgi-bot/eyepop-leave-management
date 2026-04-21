@@ -1,0 +1,111 @@
+/* common.css — EYEPOP 연차관리 공통 스타일 */
+
+:root {
+  --navy: #1a3a6b;
+  --blue: #00709F;
+  --blue-light: #e6f2f9;
+  --gray-50: #f7f9fc;
+  --gray-100: #eef2f7;
+  --gray-200: #dee5ee;
+  --gray-400: #9aa5b4;
+  --gray-600: #5a6675;
+  --gray-800: #2a323d;
+  --success: #2e7d4f;
+  --warning: #c97a1a;
+  --danger: #b93a3a;
+  --radius: 8px;
+  --shadow-sm: 0 1px 2px rgba(20, 30, 60, 0.06);
+  --shadow-md: 0 4px 10px rgba(20, 30, 60, 0.08);
+  --font: -apple-system, BlinkMacSystemFont, 'Noto Sans KR', '맑은 고딕', 'Malgun Gothic', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font);
+  background: var(--gray-50);
+  color: var(--gray-800);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-size: 14px;
+  transition: all 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--navy);
+  color: white;
+}
+.btn-primary:hover { background: #12294d; }
+
+.btn-secondary {
+  background: white;
+  color: var(--navy);
+  border: 1px solid var(--gray-200);
+}
+.btn-secondary:hover { background: var(--gray-100); }
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+.btn-danger:hover { background: #9d2e2e; }
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="date"],
+select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  background: white;
+  color: var(--gray-800);
+  outline: none;
+}
+input:focus, select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px rgba(0, 112, 159, 0.15);
+}
+
+.hidden { display: none !important; }
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--gray-800);
+  color: white;
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.25s ease;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { background: var(--success); }
+.toast.error { background: var(--danger); }
+.toast.warning { background: var(--warning); }
