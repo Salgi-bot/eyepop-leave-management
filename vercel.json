@@ -10,5 +10,11 @@
         { "key": "Referrer-Policy", "value": "no-referrer-when-downgrade" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron-promotion",
+      "schedule": "0 0 * * *"
+    }
   ]
 }
