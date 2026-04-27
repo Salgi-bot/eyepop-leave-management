@@ -405,6 +405,138 @@
     }
   }
 
+  // ── 신청내역 ──
+  state.reqFilter = { status: '', search: '' };
+
+  document.getElementById('reqStatusFilter').addEventListener('change', e => {
+    state.reqFilter.status = e.target.value;
+    renderRequestTable();
+  });
+  document.getElementById('reqSearch').addEventListener('input', e => {
+    state.reqFilter.search = e.target.value.trim().toLowerCase();
+    renderRequestTable();
+  });
+  document.getElementById('btnReloadRequests').addEventListener('click', async () => {
+    await loadAll();
+    EYEPOP.toast('새로고침 완료', 'success');
+  });
+
+  const STATUS_LABEL = {
+    pending: '<span class="badge" style="background:#fff7e6; color:#c97a1a;">대기</span>',
+    approved: '<span class="badge" style="background:#e6f4eb; color:#2e7d4f;">승인</span>',
+    auto_approved: '<span class="badge" style="background:#e6f4eb; color:#2e7d4f;">자동승인</span>',
+    rejected: '<span class="badge" style="background:#fde8e8; color:#b93a3a;">반려</span>'
+  };
+
+  function renderRequestTable() {
+    const wrap = document.getElementById('requestTableWrap');
+    if (!state.requests.length) {
+      wrap.innerHTML = '<div class="empty-state">신청 내역이 없습니다.</div>';
+      return;
+    }
+    const f = state.reqFilter;
+    const filtered = state.requests
+      .slice()
+      .sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''))
+      .filter(r => {
+        if (f.status && r.status !== f.status) return false;
+        if (f.search) {
+          const hay = `${r.employeeName} ${r.startDate} ${r.endDate} ${r.department || ''}`.toLowerCase();
+          if (!hay.includes(f.search)) return false;
+        }
+        return true;
+      });
+
+    const rows = filtered.map(r => {
+      const periodLabel = r.startDate === r.endDate ? r.startDate : `${r.startDate} ~ ${r.endDate}`;
+      const confirmLabel = r.confirmedAt
+        ? `<span title="${EYEPOP.escapeHtml(r.confirmedAt)}" style="color:#2e7d4f;">✓ 수신확인</span>`
+        : '<span style="color:#9aa5b4;">미확인</span>';
+      const actionBtns = (r.status === 'pending')
+        ? `<button class="btn-primary btn-sm" onclick="__approveRequest('${r.id}')">승인</button>
+           <button class="btn-danger btn-sm" onclick="__rejectRequest('${r.id}')">반려</button>`
+        : (r.status === 'rejected'
+            ? `<span style="font-size:11px; color:#b93a3a;" title="${EYEPOP.escapeHtml(r.rejectReason || '')}">사유 보기</span>`
+            : '');
+      return `
+        <tr data-id="${r.id}">
+          <td>${EYEPOP.escapeHtml(r.employeeName)}<br><small style="color:#9aa5b4;">${EYEPOP.escapeHtml(r.department || '')}</small></td>
+          <td>${EYEPOP.escapeHtml(periodLabel)}</td>
+          <td style="text-align:center; font-weight:600;">${r.days}일</td>
+          <td>${EYEPOP.escapeHtml(r.leaveType || '-')}</td>
+          <td>${STATUS_LABEL[r.status] || r.status}</td>
+          <td>${confirmLabel}</td>
+          <td>${actionBtns}</td>
+        </tr>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>신청자</th>
+            <th>기간</th>
+            <th>일수</th>
+            <th>종류</th>
+            <th>상태</th>
+            <th>수신확인</th>
+            <th>액션</th>
+          </tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="7" class="empty-state">검색 결과 없음</td></tr>'}</tbody>
+      </table>
+      <div style="margin-top:10px; font-size:12px; color: var(--gray-400);">
+        총 ${state.requests.length}건 / 표시 ${filtered.length}건
+      </div>
+    `;
+  }
+
+  async function approveRequest(id) {
+    const r = state.requests.find(x => x.id === id);
+    if (!r) return;
+    if (!confirm(`${r.employeeName}님 ${r.startDate}~${r.endDate} (${r.days}일) 연차를 승인하시겠습니까?\n\n신청자에게 승인 알림 메일이 발송됩니다.`)) return;
+    try {
+      const adminKey = localStorage.getItem('eyepop-admin-key');
+      const resp = await fetch('/api/approve-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ requestId: id })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      EYEPOP.toast('승인 완료', 'success');
+      await loadAll();
+    } catch (err) {
+      EYEPOP.toast('승인 실패: ' + err.message, 'error', 5000);
+    }
+  }
+  window.__approveRequest = approveRequest;
+
+  async function rejectRequest(id) {
+    const r = state.requests.find(x => x.id === id);
+    if (!r) return;
+    const reason = prompt(`${r.employeeName}님 ${r.startDate}~${r.endDate} 신청을 반려합니다.\n\n반려 사유를 입력하세요:`, '');
+    if (!reason || !reason.trim()) {
+      EYEPOP.toast('반려 사유 필수', 'warning');
+      return;
+    }
+    try {
+      const adminKey = localStorage.getItem('eyepop-admin-key');
+      const resp = await fetch('/api/reject-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ requestId: id, reason: reason.trim() })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      EYEPOP.toast('반려 완료', 'success');
+      await loadAll();
+    } catch (err) {
+      EYEPOP.toast('반려 실패: ' + err.message, 'error', 5000);
+    }
+  }
+  window.__rejectRequest = rejectRequest;
+
   // ── 초기 로드 ──
   async function loadAll() {
     try {
@@ -415,6 +547,7 @@
       state.settings = files['settings.json'] || {};
       applySettingsToForm(state.settings);
       renderEmployeeTable();
+      renderRequestTable();
     } catch (err) {
       console.error(err);
       EYEPOP.toast('데이터 로드 실패: ' + err.message, 'error', 5000);

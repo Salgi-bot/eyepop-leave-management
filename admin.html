@@ -51,9 +51,21 @@
         <!-- 신청내역 탭 -->
         <div class="tab-panel hidden" id="tab-requests">
           <h2>신청내역</h2>
-          <div class="phase-notice">
-            <strong>Phase B에서 구현 예정입니다.</strong><br>
-            직원 연차 신청, 팀장 승인, 이의 제기, 이메일 알림 기능이 이 탭에서 제공됩니다.
+          <div class="card">
+            <div class="action-row">
+              <select id="reqStatusFilter">
+                <option value="">전체 상태</option>
+                <option value="pending">대기</option>
+                <option value="approved">승인 (수동)</option>
+                <option value="auto_approved">자동승인</option>
+                <option value="rejected">반려</option>
+              </select>
+              <input type="text" id="reqSearch" placeholder="직원명·기간 검색">
+              <button class="btn-secondary" id="btnReloadRequests">↻ 새로고침</button>
+            </div>
+            <div id="requestTableWrap">
+              <div class="empty-state">신청 내역이 없습니다.</div>
+            </div>
           </div>
         </div>
 
