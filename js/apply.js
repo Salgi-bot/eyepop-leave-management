@@ -14,10 +14,7 @@
   const typeEl = document.getElementById('leaveType');
   const reasonEl = document.getElementById('reason');
 
-  // 시작일 기본값 = 오늘
-  const today = new Date().toISOString().slice(0, 10);
-  startEl.min = today;
-  endEl.min = today;
+  // 과거 날짜도 신청 가능 (부득이 후신청). min 제한 없음.
 
   // 일수 자동 계산
   function recalcDays() {
@@ -43,7 +40,6 @@
     if (startEl.value && (!endEl.value || new Date(endEl.value) < new Date(startEl.value))) {
       endEl.value = startEl.value;
     }
-    endEl.min = startEl.value || today;
     recalcDays();
   });
   endEl.addEventListener('change', recalcDays);

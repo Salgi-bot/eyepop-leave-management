@@ -108,17 +108,17 @@ export default async (req, context) => {
   };
 
   // 이메일 발송 분기
+  // 결재 흐름: 모든 신청 → 김은주 차장(adminEmail)이 처리.
+  // (settings.vicePresidentEmail은 책임자 메모용. 시스템 결재에는 사용하지 않음.)
   const adminEmail = settings.adminEmail || 'eunju@eyepopeng.com';
-  const vpEmail = settings.vicePresidentEmail || 'gunbon21@gmail.com';
   const siteOrigin = `https://${process.env.SITE_NAME || 'eyepop-leave-management'}.netlify.app`;
   const confirmUrl = `${siteOrigin}/.netlify/functions/confirm-token?t=${confirmToken}`;
 
   const emailResults = [];
   try {
-    // (1) 관리자/팀장 — 신청 알림
-    const isVpSelf = employee.email.toLowerCase() === vpEmail.toLowerCase();
-    const adminTo = isVpSelf ? vpEmail : adminEmail;
-    const adminCc = !isVpSelf && !employee.isExecutive ? employee.teamLeaderEmail : null;
+    // (1) 관리자(김은주) — 신청 알림. 일반 팀원은 팀장 CC 추가.
+    const adminTo = adminEmail;
+    const adminCc = !employee.isExecutive ? employee.teamLeaderEmail : null;
 
     const adminSubject = `[연차 ${status === 'auto_approved' ? '자동승인' : '신청'}] ${employee.name} ${startDate}~${endDate} (${days}일)`;
     const adminHtml = renderAdminMail({ employee, newRequest, leaveInfo });
