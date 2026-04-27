@@ -551,6 +551,144 @@
   }
   window.__rejectRequest = rejectRequest;
 
+  // ── 사용 촉진 (블록 E) ──
+  state.promoSelected = new Set();
+
+  document.getElementById('btnReloadPromo').addEventListener('click', () => loadAll());
+  document.getElementById('btnSendPromoSelected').addEventListener('click', () => sendPromotion('selected'));
+  document.getElementById('btnSendPromoAll').addEventListener('click', () => sendPromotion('all'));
+  document.getElementById('promoPhase').addEventListener('change', (e) => {
+    document.getElementById('promoSecondAssignWrap').classList.toggle('hidden', e.target.value !== 'second');
+  });
+
+  function getPromoTargets() {
+    return state.employees
+      .map(e => ({ emp: e, leave: calcRemaining(e, state.requests, state.settings) }))
+      .filter(x => x.leave.remaining >= 5)
+      .sort((a, b) => b.leave.remaining - a.leave.remaining);
+  }
+
+  function renderPromotion() {
+    const wrap = document.getElementById('promoTargetTableWrap');
+    const targets = getPromoTargets();
+    if (targets.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">촉진 대상자 없음 (잔여 5일 이상 직원 없음)</div>';
+    } else {
+      const rows = targets.map(({ emp, leave }) => `
+        <tr>
+          <td><input type="checkbox" class="promo-check" value="${emp.id}"
+              ${state.promoSelected.has(emp.id) ? 'checked' : ''}></td>
+          <td>${EYEPOP.escapeHtml(emp.name)}</td>
+          <td>${EYEPOP.escapeHtml(emp.department || '-')}</td>
+          <td>${EYEPOP.escapeHtml(emp.email)}</td>
+          <td style="text-align:right;">${leave.total}일</td>
+          <td style="text-align:right;">${leave.used}일</td>
+          <td style="text-align:right; color:#c97a1a; font-weight:600;">${leave.remaining}일</td>
+        </tr>
+      `).join('');
+      wrap.innerHTML = `
+        <table>
+          <thead><tr>
+            <th><input type="checkbox" id="promoCheckAll"></th>
+            <th>이름</th><th>부서</th><th>이메일</th>
+            <th style="text-align:right;">총연차</th>
+            <th style="text-align:right;">사용</th>
+            <th style="text-align:right;">잔여</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+      document.getElementById('promoCheckAll').addEventListener('change', (e) => {
+        document.querySelectorAll('.promo-check').forEach(c => {
+          c.checked = e.target.checked;
+          if (e.target.checked) state.promoSelected.add(c.value);
+          else state.promoSelected.delete(c.value);
+        });
+      });
+      document.querySelectorAll('.promo-check').forEach(c => {
+        c.addEventListener('change', (e) => {
+          if (e.target.checked) state.promoSelected.add(e.target.value);
+          else state.promoSelected.delete(e.target.value);
+        });
+      });
+    }
+
+    // 발송 이력
+    const logWrap = document.getElementById('promoLogWrap');
+    const promoLog = state.settings?.promotionLog || {};
+    const year = new Date().getFullYear();
+    const entries = [];
+    for (const phase of ['first', 'second']) {
+      const arr = promoLog[`${year}-${phase}`] || [];
+      for (const x of arr) entries.push({ ...x, phase });
+    }
+    entries.sort((a, b) => (b.sentAt || '').localeCompare(a.sentAt || ''));
+    if (entries.length === 0) {
+      logWrap.innerHTML = '<div class="empty-state">발송 이력 없음</div>';
+    } else {
+      const logRows = entries.slice(0, 50).map(x => `
+        <tr>
+          <td>${(x.sentAt || '').slice(0, 19).replace('T', ' ')}</td>
+          <td><span class="badge ${x.phase === 'first' ? 'badge-staff' : 'badge-exec'}">${x.phase === 'first' ? '1차' : '2차'}</span></td>
+          <td>${EYEPOP.escapeHtml(x.employeeName || '-')}</td>
+          <td>${EYEPOP.escapeHtml(x.email || '-')}</td>
+          <td style="text-align:right;">${x.remaining || 0}일</td>
+          <td>${EYEPOP.escapeHtml(x.assignedPeriod || '-')}</td>
+        </tr>
+      `).join('');
+      logWrap.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>발송일시</th><th>단계</th><th>이름</th><th>이메일</th>
+            <th style="text-align:right;">잔여</th><th>지정 시기</th>
+          </tr></thead>
+          <tbody>${logRows}</tbody>
+        </table>
+        ${entries.length > 50 ? `<p style="font-size:12px; color:#999; margin-top:6px;">최근 50건만 표시 (전체 ${entries.length}건)</p>` : ''}
+      `;
+    }
+  }
+
+  async function sendPromotion(scope) {
+    const phase = document.getElementById('promoPhase').value;
+    const targets = getPromoTargets();
+    let ids;
+    if (scope === 'all') {
+      ids = targets.map(x => x.emp.id);
+    } else {
+      ids = [...state.promoSelected];
+    }
+    if (ids.length === 0) {
+      EYEPOP.toast(scope === 'all' ? '대상자 없음' : '직원을 선택하세요', 'warning');
+      return;
+    }
+    let assignedPeriod = null;
+    if (phase === 'second') {
+      assignedPeriod = document.getElementById('promoAssignedPeriod').value.trim();
+      if (!assignedPeriod) {
+        EYEPOP.toast('2차 통지는 회사 지정 사용 시기를 입력하세요', 'warning');
+        return;
+      }
+    }
+    const phaseLabel = phase === 'first' ? '1차 통지' : '2차 통지';
+    if (!confirm(`${ids.length}명에게 ${phaseLabel} 메일을 발송합니다.\n\n근로기준법 제61조에 따른 법정 통지이며 3년간 보존됩니다.\n계속하시겠습니까?`)) return;
+    try {
+      const adminKey = localStorage.getItem('eyepop-admin-key');
+      const resp = await fetch('/api/send-promotion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ phase, employeeIds: ids, assignedPeriod })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      EYEPOP.toast(`발송 완료 ${data.sentCount}건${data.errorCount ? ` (실패 ${data.errorCount}건)` : ''}`, 'success');
+      state.promoSelected.clear();
+      await loadAll();
+    } catch (err) {
+      EYEPOP.toast('발송 실패: ' + err.message, 'error', 5000);
+    }
+  }
+
   // ── 초기 로드 ──
   async function loadAll() {
     try {
@@ -562,6 +700,7 @@
       applySettingsToForm(state.settings);
       renderEmployeeTable();
       renderRequestTable();
+      renderPromotion();
     } catch (err) {
       console.error(err);
       EYEPOP.toast('데이터 로드 실패: ' + err.message, 'error', 5000);

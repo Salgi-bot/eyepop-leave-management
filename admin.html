@@ -23,6 +23,7 @@
       <nav class="sidebar" id="sidebar">
         <button class="sidebar-item active" data-tab="employees">직원관리</button>
         <button class="sidebar-item" data-tab="requests">신청내역</button>
+        <button class="sidebar-item" data-tab="promotion">사용촉진</button>
         <button class="sidebar-item" data-tab="settings">설정</button>
       </nav>
 
@@ -65,6 +66,46 @@
             </div>
             <div id="requestTableWrap">
               <div class="empty-state">신청 내역이 없습니다.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 사용촉진 탭 -->
+        <div class="tab-panel hidden" id="tab-promotion">
+          <h2>연차 사용 촉진 (근로기준법 제61조)</h2>
+          <div class="card">
+            <div style="background:#f5f7fa; padding:14px 18px; border-radius:8px; margin-bottom:18px;">
+              <b>법정 통지 시기 안내</b><br/>
+              • <b>1차 통지</b>: 매년 7/1 ~ 7/10 (직원에게 사용 시기 지정 회신 요구, 10일 내)<br/>
+              • <b>2차 통지</b>: 매년 10/20 ~ 10/31 (1차 미회신자에게 회사가 사용 시기 지정 통지)<br/>
+              • 통지 후 미사용 연차에 대한 보상(수당) 지급 의무 면제<br/>
+              • 통지 기록은 3년간 보존
+            </div>
+
+            <div class="action-row">
+              <label style="font-weight:600;">통지 단계:</label>
+              <select id="promoPhase">
+                <option value="first">1차 통지 (사용 시기 지정 요청)</option>
+                <option value="second">2차 통지 (회사 시기 지정 통지)</option>
+              </select>
+              <button class="btn-primary" id="btnSendPromoSelected">선택 직원 발송</button>
+              <button class="btn-secondary" id="btnSendPromoAll">대상자 전체 발송</button>
+              <button class="btn-secondary" id="btnReloadPromo">↻ 새로고침</button>
+            </div>
+
+            <div id="promoSecondAssignWrap" class="hidden" style="margin:10px 0; padding:12px 16px; background:#fef9ec; border-radius:6px;">
+              <label style="font-weight:600;">2차 통지 — 회사 지정 사용 시기:</label>
+              <input type="text" id="promoAssignedPeriod" placeholder="예: 2026-12-22 ~ 2026-12-31 (잔여 일수 일괄 사용)" style="width:60%; margin-left:8px;">
+            </div>
+
+            <h3 style="margin-top:24px; font-size:15px;">📋 촉진 대상자 (잔여 5일 이상)</h3>
+            <div id="promoTargetTableWrap">
+              <div class="empty-state">데이터 로드 중...</div>
+            </div>
+
+            <h3 style="margin-top:24px; font-size:15px;">📨 발송 이력</h3>
+            <div id="promoLogWrap">
+              <div class="empty-state">발송 이력 없음</div>
             </div>
           </div>
         </div>
