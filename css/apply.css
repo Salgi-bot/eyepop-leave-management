@@ -44,6 +44,7 @@
   margin-bottom: 6px;
 }
 .req { color: var(--danger); }
+.required { color: var(--danger); font-weight: 700; }
 .optional { color: var(--gray-400); font-weight: 400; }
 
 .apply-form input[type="text"],

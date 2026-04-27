@@ -24,6 +24,9 @@ export default async function handler(req) {
   }
 
   const { name, email, startDate, endDate, days, entries, leaveType, reason, verbalReportConfirmed } = body;
+  if (!reason || reason.trim().length < 2) {
+    return json({ error: '사유는 필수 입력입니다. (2자 이상)' }, 400);
+  }
 
   if (!name || !email || !startDate || !endDate) {
     return json({ error: 'name, email, startDate, endDate are required' }, 400);

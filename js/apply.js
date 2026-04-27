@@ -190,6 +190,11 @@
       showError('필수 항목을 모두 입력하세요.');
       return;
     }
+    if (!payload.reason || payload.reason.length < 2) {
+      showError('사유를 입력하세요. (필수, 2자 이상)');
+      reasonEl.focus();
+      return;
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
       showError('이메일 형식이 올바르지 않습니다.');
       return;
