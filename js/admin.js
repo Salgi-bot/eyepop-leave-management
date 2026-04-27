@@ -106,19 +106,25 @@
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
+      // 컬럼명 키워드 매칭 (괄호·여러 변형 허용)
+      function pickCol(row, keywords) {
+        const k = Object.keys(row).find(key => keywords.some(w => key.includes(w)));
+        return k ? String(row[k] || '').trim() : '';
+      }
       const parsed = rows.map(r => {
-        const name = String(r['이름'] || '').trim();
-        const email = String(r['이메일'] || '').trim();
+        const name = pickCol(r, ['이름']);
+        const email = pickCol(r, ['이메일', '메일']);
         if (!name || !email) return null;
-        const hireOrDays = String(r['입사일 또는 연차일수'] || '').trim();
+        const hireOrDays = pickCol(r, ['입사일', '연차일수']);
         const isDate = /^\d{4}-\d{2}-\d{2}$/.test(hireOrDays);
+        const execStr = pickCol(r, ['임원']).toUpperCase();
         return {
           id: EYEPOP.generateId(),
           name,
           email,
-          department: String(r['부서/팀'] || '').trim(),
-          teamLeaderEmail: String(r['팀장이메일'] || '').trim(),
-          isExecutive: String(r['임원여부'] || '').trim().toUpperCase() === 'Y',
+          department: pickCol(r, ['부서']),
+          teamLeaderEmail: pickCol(r, ['팀장']),
+          isExecutive: execStr === 'Y' || execStr === '예' || execStr === '임원',
           hireDate: isDate ? hireOrDays : null,
           customLeaveDays: (!isDate && hireOrDays) ? Number(hireOrDays) || null : null
         };
