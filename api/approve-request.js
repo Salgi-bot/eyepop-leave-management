@@ -2,6 +2,7 @@
 export const config = { runtime: 'edge' };
 
 import { sendEmail, escapeHtml } from '../lib/email.js';
+import { calcRemaining } from '../lib/leave-calc.js';
 
 const GIST_API = 'https://api.github.com/gists';
 
@@ -38,6 +39,23 @@ export default async function handler(req) {
   }
   if (reqItem.status === 'rejected') {
     return json({ error: '반려된 신청은 승인할 수 없습니다.' }, 409);
+  }
+
+  // 잔여 연차 재검증 (자기 자신 제외 — 다른 신청만으로 잔여 계산)
+  const employees = gist.employees?.employees || [];
+  const settings = gist.settings || {};
+  const employee = employees.find(e => e.id === reqItem.employeeId);
+  if (!employee) {
+    return json({ error: '직원 정보를 찾을 수 없습니다. 직원 등록 확인 필요.' }, 404);
+  }
+  const otherRequests = requestsData.requests.filter(r => r.id !== requestId);
+  const leaveInfo = calcRemaining(employee, otherRequests, settings);
+  if (Number(reqItem.days) > leaveInfo.remaining) {
+    return json({
+      error: `잔여 연차(${leaveInfo.remaining}일) 부족. 신청(${reqItem.days}일) 승인 불가. 신청자에게 수정 또는 반려 요청 필요.`,
+      remaining: leaveInfo.remaining,
+      requestDays: reqItem.days
+    }, 409);
   }
 
   const now = new Date().toISOString();

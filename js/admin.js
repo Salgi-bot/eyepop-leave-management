@@ -37,6 +37,12 @@
         new Date(r.startDate).getFullYear() === year)
       .reduce((s, r) => s + (Number(r.days) || 0), 0);
   }
+  function calcPendingDays(empId, requests, year = new Date().getFullYear()) {
+    return requests
+      .filter(r => r.employeeId === empId && r.status === 'pending' &&
+        new Date(r.startDate).getFullYear() === year)
+      .reduce((s, r) => s + (Number(r.days) || 0), 0);
+  }
   function calcRemaining(emp, requests, settings) {
     const mode = settings?.leaveCalcMode || 'legal_fiscal';
     let total;
@@ -45,7 +51,8 @@
     else total = Number(emp.customLeaveDays) || 0;
     if (!total && emp.customLeaveDays != null) total = Number(emp.customLeaveDays);
     const used = calcUsedDays(emp.id, requests);
-    return { total, used, remaining: Math.max(0, total - used) };
+    const pending = calcPendingDays(emp.id, requests);
+    return { total, used, pending, remaining: Math.max(0, total - used - pending) };
   }
 
   // ── 탭 전환 ──
