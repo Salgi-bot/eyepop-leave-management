@@ -6,10 +6,46 @@
 
   const state = {
     employees: [],
+    requests: [],
     settings: null,
     activeTab: 'employees',
     filter: { search: '', dept: '' }
   };
+
+  // ── 연차 계산 (회계년도 기준, lib/leave-calc.js와 동일 로직) ──
+  function calcLegalLeaveFiscal(hireDate, asOf = new Date()) {
+    if (!hireDate) return 0;
+    const hire = new Date(hireDate);
+    if (isNaN(hire.getTime())) return 0;
+    const fy = asOf.getFullYear();
+    const hy = hire.getFullYear();
+    if (fy === hy) {
+      const dm = (asOf.getFullYear() - hire.getFullYear()) * 12 +
+                 (asOf.getMonth() - hire.getMonth()) -
+                 (asOf.getDate() < hire.getDate() ? 1 : 0);
+      return Math.max(0, Math.min(dm, 11));
+    }
+    const ys = fy - hy;
+    let base = 15;
+    if (ys >= 3) base += Math.floor((ys - 1) / 2);
+    return Math.min(base, 25);
+  }
+  function calcUsedDays(empId, requests, year = new Date().getFullYear()) {
+    return requests
+      .filter(r => r.employeeId === empId &&
+        (r.status === 'approved' || r.status === 'auto_approved') &&
+        new Date(r.startDate).getFullYear() === year)
+      .reduce((s, r) => s + (Number(r.days) || 0), 0);
+  }
+  function calcRemaining(emp, requests, settings) {
+    const mode = settings?.leaveCalcMode || 'legal_fiscal';
+    let total;
+    if (mode === 'legal_fiscal') total = calcLegalLeaveFiscal(emp.hireDate);
+    else total = Number(emp.customLeaveDays) || 0;
+    if (!total && emp.customLeaveDays != null) total = Number(emp.customLeaveDays);
+    const used = calcUsedDays(emp.id, requests);
+    return { total, used, remaining: Math.max(0, total - used) };
+  }
 
   // ── 탭 전환 ──
   document.querySelectorAll('.sidebar-item').forEach(btn => {
@@ -34,6 +70,7 @@
   document.getElementById('btnUploadExcel').addEventListener('click', () => fileExcel.click());
   document.getElementById('btnDownloadTemplate').addEventListener('click', downloadTemplate);
   document.getElementById('btnAddEmployee').addEventListener('click', addEmployeeManual);
+  document.getElementById('btnResetEmployees').addEventListener('click', resetAllEmployees);
   document.getElementById('searchInput').addEventListener('input', (e) => {
     state.filter.search = e.target.value.trim().toLowerCase();
     renderEmployeeTable();
@@ -241,7 +278,9 @@
       return true;
     });
 
-    const rows = filtered.map(e => `
+    const rows = filtered.map(e => {
+      const leave = calcRemaining(e, state.requests, state.settings);
+      return `
       <tr>
         <td>${EYEPOP.escapeHtml(e.name)}
           ${e.isExecutive ? '<span class="badge badge-exec">임원</span>' : '<span class="badge badge-staff">직원</span>'}
@@ -250,12 +289,15 @@
         <td>${EYEPOP.escapeHtml(e.department)}</td>
         <td>${EYEPOP.escapeHtml(e.teamLeaderEmail)}</td>
         <td>${e.hireDate ? EYEPOP.escapeHtml(e.hireDate) : (e.customLeaveDays != null ? `${e.customLeaveDays}일` : '-')}</td>
+        <td style="text-align:center; font-weight:600;">${leave.total}일</td>
+        <td style="text-align:center; color:#c97a1a;">${leave.used}일</td>
+        <td style="text-align:center; color:#2e7d4f; font-weight:600;">${leave.remaining}일</td>
         <td>
           <button class="btn-secondary btn-sm" onclick="__editEmployee('${e.id}')">수정</button>
           <button class="btn-danger btn-sm" onclick="__deleteEmployee('${e.id}')">삭제</button>
         </td>
       </tr>
-    `).join('');
+    `;}).join('');
 
     wrap.innerHTML = `
       <table>
@@ -266,16 +308,37 @@
             <th>부서/팀</th>
             <th>팀장 이메일</th>
             <th>입사일/연차</th>
+            <th>총연차</th>
+            <th>사용</th>
+            <th>잔여</th>
             <th></th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="6" class="empty-state">검색 결과 없음</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="9" class="empty-state">검색 결과 없음</td></tr>'}</tbody>
       </table>
       <div style="margin-top:10px; font-size:12px; color: var(--gray-400);">
-        총 ${state.employees.length}명 / 표시 ${filtered.length}명
+        총 ${state.employees.length}명 / 표시 ${filtered.length}명 · 회계년도 ${new Date().getFullYear()} 기준
       </div>
     `;
     updateDeptFilter();
+  }
+
+  async function resetAllEmployees() {
+    if (state.employees.length === 0) {
+      EYEPOP.toast('초기화할 직원 데이터가 없습니다', 'warning');
+      return;
+    }
+    const count = state.employees.length;
+    if (!confirm(`⚠️ 등록된 직원 ${count}명을 모두 삭제합니다.\n이 작업은 되돌릴 수 없습니다.\n\n계속하시겠습니까?`)) return;
+    if (!confirm(`정말 ${count}명 전원 삭제하시겠습니까?\n신청 내역은 유지됩니다.`)) return;
+    state.employees = [];
+    try {
+      await saveEmployees();
+      renderEmployeeTable();
+      EYEPOP.toast(`${count}명 전원 삭제 완료`, 'success');
+    } catch (err) {
+      EYEPOP.toast('초기화 실패: ' + err.message, 'error');
+    }
   }
 
   function updateDeptFilter() {
@@ -348,6 +411,7 @@
       const data = await EYEPOP.gist.readAll();
       const files = data.files || {};
       state.employees = (files['employees.json']?.employees) || [];
+      state.requests = (files['requests.json']?.requests) || [];
       state.settings = files['settings.json'] || {};
       applySettingsToForm(state.settings);
       renderEmployeeTable();
