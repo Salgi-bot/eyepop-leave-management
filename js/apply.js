@@ -35,6 +35,18 @@
     return { label: `${m}/${day} (${w})`, isWeekend };
   }
 
+  // YYYY-MM-DD 문자열 → 로컬 Date (timezone 안전)
+  function parseYmd(ymd) {
+    const [y, m, d] = ymd.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  function formatYmd(dt) {
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   // 날짜 변경 시 entries 자동 생성
   function rebuildEntries() {
     if (!startEl.value || !endEl.value) {
@@ -42,15 +54,14 @@
       totalRow.style.display = 'none';
       return;
     }
-    const s = new Date(startEl.value + 'T00:00:00');
-    const e = new Date(endEl.value + 'T00:00:00');
+    const s = parseYmd(startEl.value);
+    const e = parseYmd(endEl.value);
     if (isNaN(s) || isNaN(e) || e < s) {
       entriesSection.style.display = 'none';
       totalRow.style.display = 'none';
       return;
     }
-    // 최대 30일 제한
-    const diffDays = Math.floor((e - s) / 86400000) + 1;
+    const diffDays = Math.round((e - s) / 86400000) + 1;
     if (diffDays > 30) {
       showError('기간은 최대 30일까지 가능합니다.');
       entriesSection.style.display = 'none';
@@ -61,7 +72,7 @@
     const dates = [];
     let d = new Date(s);
     while (d <= e) {
-      dates.push(d.toISOString().slice(0, 10));
+      dates.push(formatYmd(d));
       d.setDate(d.getDate() + 1);
     }
     renderEntries(dates);
