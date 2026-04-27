@@ -3,7 +3,7 @@
 // 클라이언트는 x-admin-key 헤더로 인증.
 
 const GIST_API = 'https://api.github.com/gists';
-const ALLOWED_FILES = new Set(['employees.json', 'settings.json', 'requests.json']);
+const ALLOWED_FILES = new Set(['employees.json', 'settings.json', 'requests.json', 'confirm-log.json']);
 
 export default async (req, context) => {
   const token = process.env.GIST_TOKEN;

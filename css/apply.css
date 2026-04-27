@@ -1,0 +1,136 @@
+/* apply.css — 직원 연차 신청 폼 스타일 */
+
+.apply-container {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+.apply-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.apply-header h1 {
+  margin: 0 0 6px;
+  color: var(--navy);
+  font-size: 24px;
+}
+.apply-sub {
+  margin: 0;
+  color: var(--gray-400);
+  font-size: 13px;
+}
+
+.apply-form {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 28px 24px;
+}
+
+.row { margin-bottom: 18px; }
+.row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.apply-form label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 6px;
+}
+.req { color: var(--danger); }
+.optional { color: var(--gray-400); font-weight: 400; }
+
+.apply-form input[type="text"],
+.apply-form input[type="email"],
+.apply-form input[type="date"],
+.apply-form input[type="number"],
+.apply-form select,
+.apply-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 14px;
+  background: white;
+  color: var(--gray-800);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.apply-form input:focus,
+.apply-form select:focus,
+.apply-form textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-light);
+}
+.apply-form textarea { resize: vertical; min-height: 60px; }
+
+.hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--gray-400);
+}
+.hint.warn { color: var(--warning); }
+
+.checkbox-row { background: var(--gray-50); padding: 12px; border-radius: var(--radius); }
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 0 !important;
+  font-weight: 400 !important;
+}
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.error-box {
+  background: #fde8e8;
+  color: var(--danger);
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  margin: 12px 0;
+  font-size: 13px;
+  border-left: 3px solid var(--danger);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+.actions button { min-width: 110px; padding: 11px 20px; font-size: 14px; }
+
+.success-box {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 40px 28px;
+  text-align: center;
+}
+.success-icon { font-size: 48px; margin-bottom: 12px; }
+.success-box h2 { color: var(--success); margin: 0 0 16px; font-size: 20px; }
+.success-box p { color: var(--gray-600); line-height: 1.7; margin: 8px 0; }
+.success-sub { font-size: 13px; color: var(--gray-400); margin: 16px 0 24px; }
+.success-box button { margin-top: 8px; padding: 10px 24px; }
+
+.apply-footer { text-align: center; margin-top: 24px; font-size: 13px; }
+.apply-footer a { color: var(--gray-400); }
+
+@media (max-width: 480px) {
+  .row-2col { grid-template-columns: 1fr; }
+  .actions { flex-direction: column-reverse; }
+  .actions button { width: 100%; }
+}

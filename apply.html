@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>연차 신청 — EYEPOP 연차관리</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/apply.css">
+</head>
+<body>
+  <main class="apply-container">
+    <header class="apply-header">
+      <h1>연차 신청</h1>
+      <p class="apply-sub">EYEPOP 연차관리 시스템</p>
+    </header>
+
+    <form id="applyForm" class="apply-form" autocomplete="off" novalidate>
+      <div class="row">
+        <label for="name">이름 <span class="req">*</span></label>
+        <input type="text" id="name" required autocomplete="name" placeholder="홍길동">
+      </div>
+
+      <div class="row">
+        <label for="email">이메일 <span class="req">*</span></label>
+        <input type="email" id="email" required autocomplete="email" placeholder="gildong@hanmail.net">
+        <small class="hint">관리자가 등록한 이메일과 일치해야 합니다.</small>
+      </div>
+
+      <div class="row-2col">
+        <div>
+          <label for="startDate">시작일 <span class="req">*</span></label>
+          <input type="date" id="startDate" required>
+        </div>
+        <div>
+          <label for="endDate">종료일 <span class="req">*</span></label>
+          <input type="date" id="endDate" required>
+        </div>
+      </div>
+
+      <div class="row-2col">
+        <div>
+          <label for="leaveType">종류 <span class="req">*</span></label>
+          <select id="leaveType">
+            <option value="연차">연차 (1일)</option>
+            <option value="오전반차">오전반차 (0.5일)</option>
+            <option value="오후반차">오후반차 (0.5일)</option>
+          </select>
+        </div>
+        <div>
+          <label for="days">사용 일수 <span class="req">*</span></label>
+          <input type="number" id="days" min="0.5" max="30" step="0.5" required>
+          <small class="hint">자동 계산. 필요 시 수정 가능.</small>
+        </div>
+      </div>
+
+      <div class="row">
+        <label for="reason">사유 <span class="optional">(선택)</span></label>
+        <textarea id="reason" rows="3" maxlength="200" placeholder="개인 사유, 가족 행사 등"></textarea>
+        <small class="hint warn">⚠️ 건강·의료 관련 민감정보는 입력하지 마세요.</small>
+      </div>
+
+      <div class="row checkbox-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="verbalReportConfirmed">
+          <span>팀장에게 사전 구두보고를 완료했습니다.</span>
+        </label>
+        <small class="hint">임원·부사장은 해당 없음.</small>
+      </div>
+
+      <div id="errorBox" class="error-box" style="display:none;"></div>
+
+      <div class="actions">
+        <button type="button" class="btn-secondary" onclick="location.href='/'">취소</button>
+        <button type="submit" id="submitBtn" class="btn-primary">신청 제출</button>
+      </div>
+    </form>
+
+    <div id="successBox" class="success-box" style="display:none;">
+      <div class="success-icon">✅</div>
+      <h2 id="successTitle">신청이 접수되었습니다</h2>
+      <p id="successMsg"></p>
+      <p class="success-sub">신청자 이메일로 수신확인 링크가 발송되었습니다.<br/>메일함을 확인하고 링크를 1회 클릭해 주세요.</p>
+      <button class="btn-primary" onclick="location.reload()">새 신청 작성</button>
+    </div>
+
+    <p class="apply-footer">
+      <a href="/">← 홈으로</a>
+    </p>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/js/app.js"></script>
+  <script src="/js/apply.js"></script>
+</body>
+</html>

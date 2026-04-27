@@ -22,36 +22,36 @@ git pull origin main 2>&1 | tail -5 | tee -a "$LOG"
 # 2. Netlify 사이트 생성 (처음 1회만)
 if ! netlify sites:list 2>/dev/null | grep -q "$SITE_NAME "; then
   echo "  → Netlify 사이트 생성: $SITE_NAME" | tee -a "$LOG"
-  netlify sites:create --name "$SITE_NAME" --account-slug EYEPOP 2>&1 | tee -a "$LOG"
+  netlify sites:create --name "$SITE_NAME" --account-slug gunbon21 2>&1 | tee -a "$LOG"
 fi
 
 # 3. 환경변수 설정
 if [ -f "$SECRET_FILE" ]; then
   source "$SECRET_FILE"
   echo "  → GIST_TOKEN 환경변수 설정" | tee -a "$LOG"
-  netlify env:set GIST_TOKEN "$GIST_TOKEN" --scope functions --filter "$SITE_NAME" 2>&1 | tail -3 | tee -a "$LOG"
+  netlify env:set GIST_TOKEN "$GIST_TOKEN" --scope functions 2>&1 | tail -3 | tee -a "$LOG"
 fi
 
 # ADMIN_KEY 자동 생성 (이미 설정되어 있으면 skip)
-if ! netlify env:get ADMIN_KEY --filter "$SITE_NAME" 2>/dev/null | grep -q "^[a-f0-9]"; then
+if ! netlify env:get ADMIN_KEY 2>/dev/null | grep -q "^[a-f0-9]"; then
   ADMIN_KEY=$(openssl rand -hex 16)
   echo "  → ADMIN_KEY 자동 생성" | tee -a "$LOG"
-  netlify env:set ADMIN_KEY "$ADMIN_KEY" --scope functions --filter "$SITE_NAME" 2>&1 | tail -3 | tee -a "$LOG"
+  netlify env:set ADMIN_KEY "$ADMIN_KEY" --scope functions 2>&1 | tail -3 | tee -a "$LOG"
 fi
 
 # 4. 배포
 echo "  → Netlify 배포" | tee -a "$LOG"
-netlify deploy --prod --dir "$APP_DIR" --site "$SITE_NAME" 2>&1 | tee -a "$LOG"
+netlify deploy --prod --dir "$APP_DIR" 2>&1 | tee -a "$LOG"
 
 # 5. Gist 초기화 (최초 1회)
-if ! netlify env:get GIST_ID --filter "$SITE_NAME" 2>/dev/null | grep -q "."; then
+if ! netlify env:get GIST_ID 2>/dev/null | grep -q "."; then
   echo "  → Gist 최초 생성" | tee -a "$LOG"
   GIST_ID=$(curl -s "https://$SITE_NAME.netlify.app/.netlify/functions/init-gist" | grep -oE '"gistId":"[^"]+"' | cut -d'"' -f4)
   if [ -n "$GIST_ID" ]; then
     echo "  → GIST_ID: $GIST_ID" | tee -a "$LOG"
-    netlify env:set GIST_ID "$GIST_ID" --scope functions --filter "$SITE_NAME" 2>&1 | tail -3 | tee -a "$LOG"
+    netlify env:set GIST_ID "$GIST_ID" --scope functions 2>&1 | tail -3 | tee -a "$LOG"
     # 환경변수 반영을 위해 재배포
-    netlify deploy --prod --dir "$APP_DIR" --site "$SITE_NAME" 2>&1 | tail -5 | tee -a "$LOG"
+    netlify deploy --prod --dir "$APP_DIR" 2>&1 | tail -5 | tee -a "$LOG"
   fi
 fi
 

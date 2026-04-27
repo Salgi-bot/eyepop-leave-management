@@ -24,6 +24,11 @@ const DEFAULT_REQUESTS = {
   updatedAt: new Date().toISOString()
 };
 
+const DEFAULT_CONFIRM_LOG = {
+  confirmations: [],
+  updatedAt: new Date().toISOString()
+};
+
 export default async (req, context) => {
   const token = process.env.GIST_TOKEN;
   const adminKey = process.env.ADMIN_KEY;
@@ -65,7 +70,8 @@ export default async (req, context) => {
         files: {
           'employees.json': { content: JSON.stringify(DEFAULT_EMPLOYEES, null, 2) },
           'settings.json': { content: JSON.stringify(DEFAULT_SETTINGS, null, 2) },
-          'requests.json': { content: JSON.stringify(DEFAULT_REQUESTS, null, 2) }
+          'requests.json': { content: JSON.stringify(DEFAULT_REQUESTS, null, 2) },
+          'confirm-log.json': { content: JSON.stringify(DEFAULT_CONFIRM_LOG, null, 2) }
         }
       })
     });
