@@ -161,6 +161,69 @@
   }
   window.__deleteEmployee = deleteEmployee;
 
+  // ── 수정 모달 ──
+  const editModal = document.getElementById('editModal');
+  const editForm = document.getElementById('editForm');
+
+  editModal.addEventListener('click', (e) => {
+    if (e.target.dataset.close === '1') closeEditModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !editModal.classList.contains('hidden')) closeEditModal();
+  });
+
+  function openEditModal(emp) {
+    document.getElementById('edit-id').value = emp.id;
+    document.getElementById('edit-name').value = emp.name || '';
+    document.getElementById('edit-email').value = emp.email || '';
+    document.getElementById('edit-department').value = emp.department || '';
+    document.getElementById('edit-teamLeaderEmail').value = emp.teamLeaderEmail || '';
+    document.getElementById('edit-isExecutive').checked = !!emp.isExecutive;
+    document.getElementById('edit-hireDate').value = emp.hireDate || '';
+    document.getElementById('edit-customLeaveDays').value = emp.customLeaveDays != null ? emp.customLeaveDays : '';
+    editModal.classList.remove('hidden');
+  }
+
+  function closeEditModal() {
+    editModal.classList.add('hidden');
+  }
+
+  function editEmployee(id) {
+    const emp = state.employees.find(e => e.id === id);
+    if (!emp) return;
+    openEditModal(emp);
+  }
+  window.__editEmployee = editEmployee;
+
+  editForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('edit-id').value;
+    const emp = state.employees.find(x => x.id === id);
+    if (!emp) { closeEditModal(); return; }
+
+    const hireDateValue = document.getElementById('edit-hireDate').value || null;
+    const customDaysValue = document.getElementById('edit-customLeaveDays').value;
+
+    Object.assign(emp, {
+      name: document.getElementById('edit-name').value.trim(),
+      email: document.getElementById('edit-email').value.trim(),
+      department: document.getElementById('edit-department').value.trim(),
+      teamLeaderEmail: document.getElementById('edit-teamLeaderEmail').value.trim(),
+      isExecutive: document.getElementById('edit-isExecutive').checked,
+      hireDate: hireDateValue,
+      customLeaveDays: customDaysValue !== '' ? Number(customDaysValue) : null
+    });
+
+    try {
+      await saveEmployees();
+      renderEmployeeTable();
+      closeEditModal();
+      EYEPOP.toast('수정 완료', 'success');
+    } catch (err) {
+      EYEPOP.toast('저장 실패: ' + err.message, 'error');
+    }
+  });
+
   function renderEmployeeTable() {
     const wrap = document.getElementById('employeeTableWrap');
     if (!state.employees.length) {
@@ -188,6 +251,7 @@
         <td>${EYEPOP.escapeHtml(e.teamLeaderEmail)}</td>
         <td>${e.hireDate ? EYEPOP.escapeHtml(e.hireDate) : (e.customLeaveDays != null ? `${e.customLeaveDays}일` : '-')}</td>
         <td>
+          <button class="btn-secondary btn-sm" onclick="__editEmployee('${e.id}')">수정</button>
           <button class="btn-danger btn-sm" onclick="__deleteEmployee('${e.id}')">삭제</button>
         </td>
       </tr>

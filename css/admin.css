@@ -274,3 +274,75 @@ tbody tr:hover { background: var(--gray-50); }
   th, td { padding: 8px 10px; }
   .landing h1 { font-size: 22px; }
 }
+
+/* ── 직원 수정 모달 ── */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 30, 60, 0.5);
+}
+.modal-content {
+  position: relative;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  padding: 24px 28px;
+  max-width: 460px;
+  width: calc(100% - 32px);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-content h3 {
+  margin: 0 0 16px;
+  color: var(--navy);
+  font-size: 18px;
+  border-bottom: 1px solid var(--gray-100);
+  padding-bottom: 10px;
+}
+.edit-form .form-row { margin-bottom: 14px; }
+.edit-form label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-bottom: 4px;
+}
+.edit-form label small { font-weight: 400; color: var(--gray-400); }
+.edit-form input[type="text"],
+.edit-form input[type="email"],
+.edit-form input[type="date"],
+.edit-form input[type="number"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 14px;
+}
+.edit-form .checkbox-row { background: var(--gray-50); padding: 8px 12px; border-radius: var(--radius); }
+.edit-form .checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0 !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+}
+.edit-form .checkbox-label input { width: 18px; height: 18px; margin: 0; }
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--gray-100);
+}
+.modal-actions button { min-width: 90px; }
