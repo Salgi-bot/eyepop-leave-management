@@ -23,16 +23,34 @@ export default async function handler(req) {
     return json({ error: 'Invalid JSON' }, 400);
   }
 
-  const { name, email, startDate, endDate, days, leaveType, reason, verbalReportConfirmed } = body;
+  const { name, email, startDate, endDate, days, entries, leaveType, reason, verbalReportConfirmed } = body;
 
-  if (!name || !email || !startDate || !endDate || days == null) {
-    return json({ error: 'name, email, startDate, endDate, days are required' }, 400);
-  }
-  if (Number(days) <= 0 || Number(days) > 30) {
-    return json({ error: 'days must be 0 < days <= 30' }, 400);
+  if (!name || !email || !startDate || !endDate) {
+    return json({ error: 'name, email, startDate, endDate are required' }, 400);
   }
   if (new Date(endDate) < new Date(startDate)) {
     return json({ error: 'endDate must be >= startDate' }, 400);
+  }
+
+  // entries 검증 + 서버에서 days 재계산 (클라이언트 신뢰 X)
+  const TYPE_DAYS = { '연차': 1, '오전반차': 0.5, '오후반차': 0.5, '반반차': 0.25 };
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return json({ error: 'entries 배열이 비어 있습니다.' }, 400);
+  }
+  for (const ent of entries) {
+    if (!ent.date || !ent.type) {
+      return json({ error: 'entries[].date / type 필수' }, 400);
+    }
+    if (!(ent.type in TYPE_DAYS)) {
+      return json({ error: `유효하지 않은 종류: ${ent.type}` }, 400);
+    }
+    if (ent.type === '반반차' && !ent.timeRange) {
+      return json({ error: `반반차(${ent.date})는 시간 입력 필수` }, 400);
+    }
+  }
+  const computedDays = entries.reduce((s, e) => s + TYPE_DAYS[e.type], 0);
+  if (computedDays <= 0 || computedDays > 30) {
+    return json({ error: '합산 일수는 0 < days <= 30' }, 400);
   }
 
   let gist;
@@ -55,7 +73,7 @@ export default async function handler(req) {
   }
 
   const leaveInfo = calcRemaining(employee, requestsData.requests, settings);
-  if (Number(days) > leaveInfo.remaining) {
+  if (computedDays > leaveInfo.remaining) {
     return json({
       error: `잔여 연차(${leaveInfo.remaining}일)보다 많이 신청할 수 없습니다.`,
       remaining: leaveInfo.remaining
@@ -75,6 +93,10 @@ export default async function handler(req) {
   const approvalMode = settings.approvalMode || 'manual';
   const status = approvalMode === 'auto' ? 'auto_approved' : 'pending';
 
+  // 종류 라벨 (혼합 여부 판단)
+  const uniqueTypes = [...new Set(entries.map(e => e.type))];
+  const summaryType = uniqueTypes.length === 1 ? uniqueTypes[0] : '혼합';
+
   const newRequest = {
     id: reqId,
     employeeId: employee.id,
@@ -83,10 +105,11 @@ export default async function handler(req) {
     department: employee.department || '',
     teamLeaderEmail: employee.teamLeaderEmail || '',
     isExecutive: !!employee.isExecutive,
-    leaveType: leaveType || '연차',
+    leaveType: summaryType,
+    entries,
     startDate,
     endDate,
-    days: Number(days),
+    days: computedDays,
     reason: reason || '',
     verbalReportConfirmed: !!verbalReportConfirmed,
     submittedAt: now.toISOString(),
@@ -113,7 +136,7 @@ export default async function handler(req) {
     const adminTo = adminEmail;
     const adminCc = !employee.isExecutive ? employee.teamLeaderEmail : null;
 
-    const adminSubject = `[연차 ${status === 'auto_approved' ? '자동승인' : '신청'}] ${employee.name} ${startDate}~${endDate} (${days}일)`;
+    const adminSubject = `[연차 ${status === 'auto_approved' ? '자동승인' : '신청'}] ${employee.name} ${startDate}~${endDate} (${computedDays}일)`;
     const adminHtml = renderAdminMail({ employee, newRequest, leaveInfo });
     const r1 = await sendEmail({ to: adminTo, cc: adminCc || undefined, subject: adminSubject, html: adminHtml });
     emailResults.push({ to: adminTo, role: 'admin', sentAt: r1.sentAt, messageId: r1.messageId });
@@ -199,37 +222,52 @@ function formatYmd(d) {
   return `${yy}${mm}${dd}`;
 }
 
+function renderEntriesTable(entries) {
+  if (!entries || !entries.length) return '';
+  const rows = entries.map(e => {
+    const time = e.timeRange ? ` <span style="color:#777; font-size:12px;">(${escapeHtml(e.timeRange)})</span>` : '';
+    return `<tr><td style="padding:4px 8px; border-bottom:1px solid #eee;">${escapeHtml(e.date)}</td><td style="padding:4px 8px; border-bottom:1px solid #eee;">${escapeHtml(e.type)}${time}</td><td style="padding:4px 8px; border-bottom:1px solid #eee; text-align:right;">${e.days}일</td></tr>`;
+  }).join('');
+  return `<table style="border-collapse:collapse; width:100%; margin-top:6px; font-size:13px;">
+    <thead><tr style="background:#f5f7fa;"><th style="padding:6px 8px; text-align:left;">날짜</th><th style="padding:6px 8px; text-align:left;">종류</th><th style="padding:6px 8px; text-align:right;">일수</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 function renderAdminMail({ employee, newRequest, leaveInfo }) {
-  const { startDate, endDate, days, leaveType, reason, status, verbalReportConfirmed } = newRequest;
+  const { startDate, endDate, days, leaveType, entries, reason, status, verbalReportConfirmed } = newRequest;
   const statusLabel = status === 'auto_approved' ? '자동 승인됨' : '승인 대기';
   return `
-  <div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif; line-height:1.6; max-width:600px;">
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif; line-height:1.6; max-width:640px;">
     <h2 style="border-bottom:2px solid #4a90e2; padding-bottom:8px;">연차 신청 ${statusLabel}</h2>
     <table style="border-collapse:collapse; width:100%;">
-      <tr><td style="padding:6px; background:#f5f7fa;">신청자</td><td style="padding:6px;">${escapeHtml(employee.name)} (${escapeHtml(employee.department || '-')})</td></tr>
-      <tr><td style="padding:6px; background:#f5f7fa;">기간</td><td style="padding:6px;">${escapeHtml(startDate)} ~ ${escapeHtml(endDate)} (${days}일)</td></tr>
+      <tr><td style="padding:6px; background:#f5f7fa; width:120px;">신청자</td><td style="padding:6px;">${escapeHtml(employee.name)} (${escapeHtml(employee.department || '-')})</td></tr>
+      <tr><td style="padding:6px; background:#f5f7fa;">기간</td><td style="padding:6px;">${escapeHtml(startDate)} ~ ${escapeHtml(endDate)} <b>총 ${days}일</b></td></tr>
       <tr><td style="padding:6px; background:#f5f7fa;">종류</td><td style="padding:6px;">${escapeHtml(leaveType)}</td></tr>
       <tr><td style="padding:6px; background:#f5f7fa;">사유</td><td style="padding:6px;">${escapeHtml(reason) || '-'}</td></tr>
       <tr><td style="padding:6px; background:#f5f7fa;">팀장 구두보고</td><td style="padding:6px;">${verbalReportConfirmed ? '✅ 확인' : '⚠️ 미확인'}</td></tr>
       <tr><td style="padding:6px; background:#f5f7fa;">잔여 (사용/총)</td><td style="padding:6px;">${leaveInfo.remaining}일 (${leaveInfo.used}/${leaveInfo.total})</td></tr>
     </table>
+    <h3 style="margin:18px 0 6px; font-size:14px;">일자별 사용 내역</h3>
+    ${renderEntriesTable(entries)}
   </div>`;
 }
 
 function renderEmployeeMail({ employee, newRequest, leaveInfo, confirmUrl, status }) {
-  const { startDate, endDate, days } = newRequest;
+  const { startDate, endDate, days, entries } = newRequest;
   const statusMsg =
     status === 'auto_approved'
       ? '연차 신청이 자동으로 <b>승인</b>되었습니다.'
       : '연차 신청이 <b>접수</b>되었습니다. 관리자 승인 후 안내 메일을 다시 보내드립니다.';
   return `
-  <div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif; line-height:1.7; max-width:600px;">
+  <div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif; line-height:1.7; max-width:640px;">
     <h2 style="border-bottom:2px solid #4a90e2; padding-bottom:8px;">${escapeHtml(employee.name)}님</h2>
     <p>${statusMsg}</p>
     <table style="border-collapse:collapse; margin:12px 0;">
-      <tr><td style="padding:6px;">기간</td><td style="padding:6px; font-weight:bold;">${escapeHtml(startDate)} ~ ${escapeHtml(endDate)} (${days}일)</td></tr>
+      <tr><td style="padding:6px;">기간</td><td style="padding:6px; font-weight:bold;">${escapeHtml(startDate)} ~ ${escapeHtml(endDate)} 총 ${days}일</td></tr>
       <tr><td style="padding:6px;">사용 후 잔여</td><td style="padding:6px;">${leaveInfo.remaining - days}일</td></tr>
     </table>
+    ${renderEntriesTable(entries)}
     <p style="margin:24px 0;">
       <a href="${confirmUrl}" style="display:inline-block; padding:12px 24px; background:#4a90e2; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">📩 수신 확인하기</a>
     </p>

@@ -38,19 +38,17 @@
         </div>
       </div>
 
-      <div class="row-2col">
-        <div>
-          <label for="leaveType">종류 <span class="req">*</span></label>
-          <select id="leaveType">
-            <option value="연차">연차 (1일)</option>
-            <option value="오전반차">오전반차 (0.5일)</option>
-            <option value="오후반차">오후반차 (0.5일)</option>
-          </select>
-        </div>
-        <div>
-          <label for="days">사용 일수 <span class="req">*</span></label>
-          <input type="number" id="days" min="0.5" max="30" step="0.5" required>
-          <small class="hint">자동 계산. 필요 시 수정 가능.</small>
+      <div class="row" id="entriesSection" style="display:none;">
+        <label>일자별 사용 내역 <span class="req">*</span></label>
+        <div id="entriesList" class="entries-list"></div>
+        <small class="hint">각 날짜의 종류를 선택하세요. <b>반반차</b>는 시간 입력 (예: <code>13:00~15:00</code>).</small>
+      </div>
+
+      <div class="row" id="totalRow" style="display:none;">
+        <div class="total-display">
+          <span class="total-label">합산 사용 일수</span>
+          <span class="total-value" id="totalDays">0</span>
+          <span class="total-unit">일</span>
         </div>
       </div>
 
