@@ -26,6 +26,7 @@
   <script src="/js/app.js"></script>
   <script>
     const ADMIN_PW = '0494';
+    const ADMIN_KEY = 'd2442d2946b8abc75f5f4226ed28c26a';
     const form = document.getElementById('loginForm');
     const errMsg = document.getElementById('errorMsg');
     form.addEventListener('submit', (e) => {
@@ -36,6 +37,7 @@
           loggedIn: true,
           loginAt: Date.now()
         }));
+        localStorage.setItem('eyepop-admin-key', ADMIN_KEY);
         location.href = '/admin.html';
       } else {
         errMsg.classList.add('show');

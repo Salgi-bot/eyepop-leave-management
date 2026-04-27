@@ -10,11 +10,8 @@ EYEPOP.gist = (function() {
   function getAdminKey() {
     const k = localStorage.getItem('eyepop-admin-key');
     if (!k) {
-      const entered = prompt('관리자 API 키를 입력하세요 (Netlify ADMIN_KEY):');
-      if (entered) {
-        localStorage.setItem('eyepop-admin-key', entered.trim());
-        return entered.trim();
-      }
+      // 세션 만료 또는 키 손실 → 로그인 페이지로 리다이렉트
+      location.href = '/admin-login.html';
       return null;
     }
     return k;
