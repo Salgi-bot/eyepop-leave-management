@@ -44,15 +44,20 @@
       .reduce((s, r) => s + (Number(r.days) || 0), 0);
   }
   function calcRemaining(emp, requests, settings) {
-    const mode = settings?.leaveCalcMode || 'legal_fiscal';
     let total;
-    // 'legal' / 'legal_fiscal' 둘 다 회계년도 기준 (사내 통일)
-    if (mode === 'legal_fiscal' || mode === 'legal') total = calcLegalLeaveFiscal(emp.hireDate);
-    else total = Number(emp.customLeaveDays) || 0;
-    if (!total && emp.customLeaveDays != null) total = Number(emp.customLeaveDays);
-    const used = calcUsedDays(emp.id, requests);
+    // customLeaveDays 우선 (회계년도 도중 도입 / 정년 촉진계약자 등)
+    if (emp.customLeaveDays != null && emp.customLeaveDays !== '') {
+      total = Number(emp.customLeaveDays) || 0;
+    } else {
+      const mode = settings?.leaveCalcMode || 'legal_fiscal';
+      if (mode === 'legal_fiscal' || mode === 'legal') total = calcLegalLeaveFiscal(emp.hireDate);
+      else total = 0;
+    }
+    const preUsed = Number(emp.customUsedDays) || 0; // 시스템 도입 전 이미 사용한 일수
+    const sysUsed = calcUsedDays(emp.id, requests);
     const pending = calcPendingDays(emp.id, requests);
-    return { total, used, pending, remaining: Math.max(0, total - used - pending) };
+    const used = preUsed + sysUsed;
+    return { total, used, preUsed, sysUsed, pending, remaining: Math.max(0, total - used - pending) };
   }
 
   // ── 탭 전환 ──
@@ -91,11 +96,11 @@
   fileExcel.addEventListener('change', handleExcelUpload);
 
   function downloadTemplate() {
-    const headers = ['이름', '이메일', '부서/팀', '팀장이메일', '임원여부', '입사일 또는 연차일수'];
+    const headers = ['이름', '이메일', '부서/팀', '팀장이메일', '임원여부', '입사일 또는 연차일수', '이미 사용한 일수(선반영)'];
     const sample = [
-      ['홍길동', 'gildong@hanmail.net', '설계사업본부/1팀', 'leader1@eyepopeng.com', 'N', '2024-03-15'],
-      ['김영희', 'younghee@eyepopeng.com', '경영지원팀', 'ceo@eyepopeng.com', 'N', '2023-07-01'],
-      ['박상무', 'park@eyepopeng.com', '임원', '', 'Y', '15']
+      ['홍길동', 'gildong@hanmail.net', '설계사업본부/1팀', 'leader1@eyepopeng.com', 'N', '2024-03-15', ''],
+      ['김영희', 'younghee@eyepopeng.com', '경영지원팀', 'ceo@eyepopeng.com', 'N', '2023-07-01', '3'],
+      ['박상무', 'park@eyepopeng.com', '임원', '', 'Y', '15', '0']
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers, ...sample]);
     ws['!cols'] = headers.map(h => ({ wch: h.length < 10 ? 15 : 22 }));
@@ -126,6 +131,8 @@
         const hireOrDays = pickCol(r, ['입사일', '연차일수']);
         const isDate = /^\d{4}-\d{2}-\d{2}$/.test(hireOrDays);
         const execStr = pickCol(r, ['임원']).toUpperCase();
+        const usedStr = pickCol(r, ['이미사용', '선반영', '기사용']);
+        const usedNum = usedStr && !isNaN(Number(usedStr)) ? Number(usedStr) : null;
         return {
           id: EYEPOP.generateId(),
           name,
@@ -134,7 +141,8 @@
           teamLeaderEmail: pickCol(r, ['팀장']),
           isExecutive: execStr === 'Y' || execStr === '예' || execStr === '임원',
           hireDate: isDate ? hireOrDays : null,
-          customLeaveDays: (!isDate && hireOrDays) ? Number(hireOrDays) || null : null
+          customLeaveDays: (!isDate && hireOrDays) ? Number(hireOrDays) || null : null,
+          customUsedDays: usedNum
         };
       }).filter(Boolean);
 
@@ -232,6 +240,7 @@
     document.getElementById('edit-isExecutive').checked = !!emp.isExecutive;
     document.getElementById('edit-hireDate').value = emp.hireDate || '';
     document.getElementById('edit-customLeaveDays').value = emp.customLeaveDays != null ? emp.customLeaveDays : '';
+    document.getElementById('edit-customUsedDays').value = emp.customUsedDays != null ? emp.customUsedDays : '';
     editModal.classList.remove('hidden');
   }
 
@@ -254,6 +263,7 @@
 
     const hireDateValue = document.getElementById('edit-hireDate').value || null;
     const customDaysValue = document.getElementById('edit-customLeaveDays').value;
+    const customUsedValue = document.getElementById('edit-customUsedDays').value;
 
     Object.assign(emp, {
       name: document.getElementById('edit-name').value.trim(),
@@ -262,7 +272,8 @@
       teamLeaderEmail: document.getElementById('edit-teamLeaderEmail').value.trim(),
       isExecutive: document.getElementById('edit-isExecutive').checked,
       hireDate: hireDateValue,
-      customLeaveDays: customDaysValue !== '' ? Number(customDaysValue) : null
+      customLeaveDays: customDaysValue !== '' ? Number(customDaysValue) : null,
+      customUsedDays: customUsedValue !== '' ? Number(customUsedValue) : null
     });
 
     try {
