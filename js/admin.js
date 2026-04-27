@@ -689,6 +689,262 @@
     }
   }
 
+  // ── 출퇴근 대조 (블록 D) ──
+  state.attendance = { rows: [], compared: [], filter: 'all' };
+
+  const fileAttendance = document.getElementById('fileAttendance');
+  document.getElementById('btnUploadAttendance').addEventListener('click', () => fileAttendance.click());
+  fileAttendance.addEventListener('change', handleAttendanceUpload);
+  document.getElementById('btnClearAttendance').addEventListener('click', clearAttendance);
+  document.getElementById('btnDownloadAttendance').addEventListener('click', downloadAttendanceResult);
+  document.getElementById('attFilter').addEventListener('change', (e) => {
+    state.attendance.filter = e.target.value;
+    renderAttendance();
+  });
+
+  async function handleAttendanceUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const arr = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1 });
+      if (arr.length < 2) {
+        EYEPOP.toast('데이터 행이 없습니다', 'error');
+        return;
+      }
+      const header = arr[0].map(h => String(h).replace(/^'|'$/g, '').trim());
+      const idx = {
+        date: header.findIndex(h => h.includes('근무일자')),
+        name: header.findIndex(h => h.includes('이름')),
+        org2: header.findIndex(h => h.includes('조직2')),
+        startTime: header.findIndex(h => h.includes('출근시간')),
+        endTime: header.findIndex(h => h.includes('퇴근시간')),
+        startJudge: header.findIndex(h => h.includes('출근판정')),
+        endJudge: header.findIndex(h => h.includes('퇴근판정')),
+        actualWork: header.findIndex(h => h.includes('실제근무시간')),
+        outside: header.findIndex(h => h.includes('외출여부'))
+      };
+      if (idx.date < 0 || idx.name < 0) {
+        EYEPOP.toast('SECOM 엑셀 형식이 아닙니다 (근무일자/이름 컬럼 누락)', 'error');
+        return;
+      }
+      const rows = [];
+      for (let i = 1; i < arr.length; i++) {
+        const r = arr[i];
+        if (!r || r.length === 0) continue;
+        const cleanCell = (v) => String(v ?? '').replace(/^'|'$/g, '').trim();
+        const dateRaw = cleanCell(r[idx.date]);
+        const name = cleanCell(r[idx.name]);
+        if (!dateRaw || !name) continue;
+        rows.push({
+          date: normalizeDate(dateRaw),
+          name,
+          org: idx.org2 >= 0 ? cleanCell(r[idx.org2]) : '',
+          startTime: idx.startTime >= 0 ? cleanCell(r[idx.startTime]) : '',
+          endTime: idx.endTime >= 0 ? cleanCell(r[idx.endTime]) : '',
+          startJudge: idx.startJudge >= 0 ? cleanCell(r[idx.startJudge]) : '',
+          endJudge: idx.endJudge >= 0 ? cleanCell(r[idx.endJudge]) : '',
+          actualWork: idx.actualWork >= 0 ? cleanCell(r[idx.actualWork]) : '',
+          outside: idx.outside >= 0 ? cleanCell(r[idx.outside]) : ''
+        });
+      }
+      state.attendance.rows = rows;
+      compareAttendance();
+      renderAttendance();
+      EYEPOP.toast(`${rows.length}행 로드 완료`, 'success');
+      fileAttendance.value = '';
+    } catch (err) {
+      console.error(err);
+      EYEPOP.toast('엑셀 파싱 실패: ' + err.message, 'error');
+    }
+  }
+
+  function normalizeDate(s) {
+    // "2026/04/20" 또는 "2026-04-20" → "2026-04-20"
+    return s.replace(/\//g, '-').slice(0, 10);
+  }
+
+  function compareAttendance() {
+    const rows = state.attendance.rows;
+    if (rows.length === 0) {
+      state.attendance.compared = [];
+      return;
+    }
+    // SECOM 데이터에서 날짜 범위 추출
+    const dates = [...new Set(rows.map(r => r.date))].sort();
+    const employees = state.employees;
+    const requests = state.requests;
+
+    // SECOM (날짜+이름) 인덱스
+    const secomIdx = new Map();
+    rows.forEach(r => secomIdx.set(`${r.date}|${r.name}`, r));
+
+    // 신청 (날짜+이름) 인덱스 — entries 기반
+    const reqIdx = new Map();
+    requests.forEach(req => {
+      if (req.status === 'rejected') return;
+      const empName = req.employeeName;
+      const entries = req.entries || [];
+      if (entries.length > 0) {
+        entries.forEach(e => {
+          if (e.type === '없음') return;
+          const k = `${e.date}|${empName}`;
+          if (!reqIdx.has(k)) reqIdx.set(k, []);
+          reqIdx.get(k).push({ ...e, status: req.status, reqId: req.id });
+        });
+      } else {
+        // 구버전 (entries 없으면 날짜 범위 펼치기)
+        const start = new Date(req.startDate);
+        const end = new Date(req.endDate);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dt = d.toISOString().slice(0, 10);
+          const k = `${dt}|${empName}`;
+          if (!reqIdx.has(k)) reqIdx.set(k, []);
+          reqIdx.get(k).push({ date: dt, type: req.leaveType || '연차', days: 1, status: req.status, reqId: req.id });
+        }
+      }
+    });
+
+    const compared = [];
+    for (const dt of dates) {
+      // 평일만 (주말 제외) — Date 객체로 요일 판정
+      const dayObj = new Date(dt + 'T00:00:00');
+      const wd = dayObj.getDay();
+      if (wd === 0 || wd === 6) continue;
+
+      for (const emp of employees) {
+        if (emp.isExecutive) continue; // 임원은 SECOM 미적용
+        const secom = secomIdx.get(`${dt}|${emp.name}`);
+        const reqEntries = reqIdx.get(`${dt}|${emp.name}`) || [];
+        const reqType = reqEntries.length > 0 ? reqEntries.map(x => x.type).join('+') : null;
+        const reqStatus = reqEntries.length > 0 ? reqEntries[0].status : null;
+        const totalReqDays = reqEntries.reduce((s, x) => s + (Number(x.days) || 0), 0);
+
+        let verdict, level;
+        if (secom && reqEntries.length === 0) {
+          verdict = '정상 (출근)'; level = 'ok';
+        } else if (!secom && reqEntries.length === 0) {
+          verdict = '⚠ 미신청 결근'; level = 'anomaly';
+        } else if (!secom && reqEntries.length > 0) {
+          if (reqStatus === 'pending') { verdict = '🟡 신청 대기 (결근)'; level = 'warn'; }
+          else { verdict = '정상 (연차)'; level = 'ok'; }
+        } else if (secom && reqEntries.length > 0) {
+          // 출근 + 연차 신청 동시 → 반차/반반차/3/4차는 정상, 종일 연차면 이상
+          if (totalReqDays >= 1) { verdict = '⚠ 신청 후 출근'; level = 'anomaly'; }
+          else {
+            // 반차류 — 실제 근무시간으로 추정 검증
+            const wh = parseHHMM(secom.actualWork);
+            const expectedAbsent = totalReqDays * 8; // 8시간 = 1일
+            const expectedWork = 8 - expectedAbsent;
+            // 실제 근무가 예상 + 1.5시간 초과 시 의심
+            if (wh > expectedWork + 1.5) { verdict = `⚠ 반차 시간 의심 (${secom.actualWork} 근무, ${reqType})`; level = 'anomaly'; }
+            else { verdict = `정상 (${reqType})`; level = 'ok'; }
+          }
+        }
+
+        compared.push({
+          date: dt, name: emp.name, dept: emp.department || '',
+          startTime: secom?.startTime || '', endTime: secom?.endTime || '',
+          startJudge: secom?.startJudge || '', actualWork: secom?.actualWork || '',
+          reqType: reqType || '', reqStatus: reqStatus || '', reqDays: totalReqDays,
+          verdict, level
+        });
+      }
+    }
+    state.attendance.compared = compared;
+  }
+
+  function parseHHMM(s) {
+    if (!s) return 0;
+    const m = String(s).match(/(\d+):(\d+)/);
+    if (!m) return 0;
+    return Number(m[1]) + Number(m[2]) / 60;
+  }
+
+  function renderAttendance() {
+    const wrap = document.getElementById('attTableWrap');
+    const summary = document.getElementById('attSummary');
+    const compared = state.attendance.compared;
+    if (compared.length === 0) {
+      wrap.innerHTML = '<div class="empty-state">SECOM 엑셀을 업로드해주세요.</div>';
+      summary.innerHTML = '';
+      return;
+    }
+    const counts = compared.reduce((acc, c) => {
+      acc[c.level] = (acc[c.level] || 0) + 1;
+      return acc;
+    }, {});
+    summary.innerHTML = `
+      <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px;">
+        <span>전체: <b>${compared.length}건</b></span>
+        <span style="color:#2e7d4f;">정상: ${counts.ok || 0}건</span>
+        <span style="color:#c97a1a;">대기: ${counts.warn || 0}건</span>
+        <span style="color:#b93a3a; font-weight:600;">이상: ${counts.anomaly || 0}건</span>
+      </div>`;
+
+    let filtered = compared;
+    if (state.attendance.filter === 'anomaly') filtered = compared.filter(c => c.level === 'anomaly');
+    else if (state.attendance.filter === 'normal') filtered = compared.filter(c => c.level === 'ok');
+
+    const rows = filtered.map(c => {
+      const bg = c.level === 'anomaly' ? 'background:#fef2f2;'
+        : c.level === 'warn' ? 'background:#fef9ec;'
+        : '';
+      return `
+      <tr style="${bg}">
+        <td>${EYEPOP.escapeHtml(c.date)}</td>
+        <td>${EYEPOP.escapeHtml(c.name)}</td>
+        <td>${EYEPOP.escapeHtml(c.dept)}</td>
+        <td>${EYEPOP.escapeHtml(c.startTime.slice(11) || '-')}</td>
+        <td>${EYEPOP.escapeHtml(c.endTime.slice(11) || '-')}</td>
+        <td>${EYEPOP.escapeHtml(c.actualWork || '-')}</td>
+        <td>${EYEPOP.escapeHtml(c.reqType || '-')}</td>
+        <td style="font-weight:${c.level === 'anomaly' ? '700' : '400'}; color:${c.level === 'anomaly' ? '#b93a3a' : c.level === 'warn' ? '#c97a1a' : '#2e7d4f'};">${EYEPOP.escapeHtml(c.verdict)}</td>
+      </tr>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>날짜</th><th>이름</th><th>부서</th>
+          <th>출근</th><th>퇴근</th><th>실근무</th>
+          <th>연차 신청</th><th>판정</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${filtered.length === 0 ? '<div class="empty-state">필터 조건에 해당하는 행 없음</div>' : ''}`;
+  }
+
+  function clearAttendance() {
+    if (state.attendance.rows.length === 0) return;
+    if (!confirm('업로드한 SECOM 데이터를 초기화합니다.\n계속하시겠습니까?')) return;
+    state.attendance = { rows: [], compared: [], filter: 'all' };
+    document.getElementById('attFilter').value = 'all';
+    renderAttendance();
+    EYEPOP.toast('초기화 완료', 'success');
+  }
+
+  function downloadAttendanceResult() {
+    const compared = state.attendance.compared;
+    if (compared.length === 0) {
+      EYEPOP.toast('대조 결과가 없습니다', 'warning');
+      return;
+    }
+    const headers = ['날짜', '이름', '부서', '출근시간', '퇴근시간', '실근무', '연차신청', '신청상태', '판정'];
+    const aoa = [headers, ...compared.map(c => [
+      c.date, c.name, c.dept, c.startTime, c.endTime, c.actualWork,
+      c.reqType, c.reqStatus, c.verdict
+    ])];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = headers.map(h => ({ wch: h.length < 8 ? 12 : 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '출퇴근대조');
+    const ymd = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `eyepop-출퇴근대조-${ymd}.xlsx`);
+  }
+
   // ── 초기 로드 ──
   async function loadAll() {
     try {

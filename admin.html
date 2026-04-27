@@ -24,6 +24,7 @@
         <button class="sidebar-item active" data-tab="employees">직원관리</button>
         <button class="sidebar-item" data-tab="requests">신청내역</button>
         <button class="sidebar-item" data-tab="promotion">사용촉진</button>
+        <button class="sidebar-item" data-tab="attendance">출퇴근 대조</button>
         <button class="sidebar-item" data-tab="settings">설정</button>
       </nav>
 
@@ -106,6 +107,37 @@
             <h3 style="margin-top:24px; font-size:15px;">📨 발송 이력</h3>
             <div id="promoLogWrap">
               <div class="empty-state">발송 이력 없음</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 출퇴근 대조 탭 -->
+        <div class="tab-panel hidden" id="tab-attendance">
+          <h2>SECOM 출퇴근 대조</h2>
+          <div class="card">
+            <div style="background:#f5f7fa; padding:14px 18px; border-radius:8px; margin-bottom:18px; font-size:13px;">
+              <b>기능 안내</b><br/>
+              • SECOM 출퇴근 엑셀 (.xls/.xlsx) 업로드 시 자동 파싱<br/>
+              • 같은 기간의 연차 신청과 자동 대조 → <b>이상치 강조 표시</b><br/>
+              • 이상치: 미신청 결근 / 연차 신청 후 출근 / 반차 시간 불일치<br/>
+              • 업로드한 SECOM 데이터는 서버 저장하지 않음 (브라우저 메모리만 사용)
+            </div>
+
+            <div class="action-row">
+              <button class="btn-primary" id="btnUploadAttendance">SECOM 엑셀 업로드</button>
+              <input type="file" id="fileAttendance" accept=".xls,.xlsx" class="hidden">
+              <select id="attFilter">
+                <option value="all">전체 표시</option>
+                <option value="anomaly">이상치만</option>
+                <option value="normal">정상만</option>
+              </select>
+              <button class="btn-secondary" id="btnDownloadAttendance">결과 엑셀 다운로드</button>
+              <button class="btn-secondary" id="btnClearAttendance">초기화</button>
+            </div>
+
+            <div id="attSummary" style="margin:14px 0;"></div>
+            <div id="attTableWrap">
+              <div class="empty-state">SECOM 엑셀을 업로드해주세요.</div>
             </div>
           </div>
         </div>
