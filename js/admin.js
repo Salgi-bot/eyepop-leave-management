@@ -815,7 +815,7 @@
       if (wd === 0 || wd === 6) continue;
 
       for (const emp of employees) {
-        if (emp.isExecutive) continue; // 임원은 SECOM 미적용
+        if (emp.name === '김홍정') continue; // 김홍정 부사장은 SECOM 미적용 (그 외 임원은 포함)
         const secom = secomIdx.get(`${dt}|${emp.name}`);
         const reqEntries = reqIdx.get(`${dt}|${emp.name}`) || [];
         const reqType = reqEntries.length > 0 ? reqEntries.map(x => x.type).join('+') : null;
