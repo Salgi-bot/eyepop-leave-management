@@ -40,7 +40,8 @@
   function calcRemaining(emp, requests, settings) {
     const mode = settings?.leaveCalcMode || 'legal_fiscal';
     let total;
-    if (mode === 'legal_fiscal') total = calcLegalLeaveFiscal(emp.hireDate);
+    // 'legal' / 'legal_fiscal' 둘 다 회계년도 기준 (사내 통일)
+    if (mode === 'legal_fiscal' || mode === 'legal') total = calcLegalLeaveFiscal(emp.hireDate);
     else total = Number(emp.customLeaveDays) || 0;
     if (!total && emp.customLeaveDays != null) total = Number(emp.customLeaveDays);
     const used = calcUsedDays(emp.id, requests);
