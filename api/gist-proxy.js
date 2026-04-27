@@ -1,11 +1,10 @@
-// gist-proxy.js
-// Gist Read/Write 프록시. 토큰은 서버에서만 사용.
-// 클라이언트는 x-admin-key 헤더로 인증.
+// Vercel Edge Function — Gist Read/Write 프록시
+export const config = { runtime: 'edge' };
 
 const GIST_API = 'https://api.github.com/gists';
 const ALLOWED_FILES = new Set(['employees.json', 'settings.json', 'requests.json', 'confirm-log.json']);
 
-export default async (req, context) => {
+export default async function handler(req) {
   const token = process.env.GIST_TOKEN;
   const gistId = process.env.GIST_ID;
   const adminKey = process.env.ADMIN_KEY;
@@ -14,7 +13,6 @@ export default async (req, context) => {
   if (!gistId) return json({ error: 'GIST_ID not configured — run init-gist first' }, 500);
   if (!adminKey) return json({ error: 'ADMIN_KEY not configured' }, 500);
 
-  // CORS 간단 처리 (동일 도메인 기준이므로 과도한 헤더 생략)
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
@@ -29,7 +27,6 @@ export default async (req, context) => {
     return json({ error: 'Method not allowed' }, 405);
   }
 
-  // 관리자 키 확인
   const providedKey = req.headers.get('x-admin-key');
   if (providedKey !== adminKey) {
     return json({ error: 'Unauthorized' }, 401);
@@ -62,7 +59,7 @@ export default async (req, context) => {
   } catch (err) {
     return json({ error: 'Unexpected error', detail: err.message }, 500);
   }
-};
+}
 
 async function handleRead(token, gistId, file) {
   const resp = await fetch(`${GIST_API}/${gistId}`, {
@@ -90,7 +87,6 @@ async function handleRead(token, gistId, file) {
     return json({ file, content: parsed });
   }
 
-  // 전체 파일 반환
   const files = {};
   for (const [name, f] of Object.entries(data.files || {})) {
     try {

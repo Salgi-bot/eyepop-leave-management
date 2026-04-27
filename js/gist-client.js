@@ -5,7 +5,7 @@
 window.EYEPOP = window.EYEPOP || {};
 
 EYEPOP.gist = (function() {
-  const API = '/.netlify/functions';
+  const API = '/api';
 
   function getAdminKey() {
     const k = localStorage.getItem('eyepop-admin-key');

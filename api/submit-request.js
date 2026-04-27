@@ -1,13 +1,12 @@
-// 연차 신청 접수 Function
-// 1) 직원 검증 → 2) 잔여 연차 계산 → 3) 토큰 생성 → 4) Gist 저장 → 5) 이메일 3건 발송
+// Vercel Edge Function — 연차 신청 접수
+export const config = { runtime: 'edge' };
 
-import crypto from 'node:crypto';
-import { sendEmail, escapeHtml } from './_shared/email.js';
-import { calcRemaining, diffDaysInclusive } from './_shared/leave-calc.js';
+import { sendEmail, escapeHtml } from '../lib/email.js';
+import { calcRemaining } from '../lib/leave-calc.js';
 
 const GIST_API = 'https://api.github.com/gists';
 
-export default async (req, context) => {
+export default async function handler(req) {
   if (req.method === 'OPTIONS') return cors();
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
@@ -26,7 +25,6 @@ export default async (req, context) => {
 
   const { name, email, startDate, endDate, days, leaveType, reason, verbalReportConfirmed } = body;
 
-  // 입력 검증
   if (!name || !email || !startDate || !endDate || days == null) {
     return json({ error: 'name, email, startDate, endDate, days are required' }, 400);
   }
@@ -37,7 +35,6 @@ export default async (req, context) => {
     return json({ error: 'endDate must be >= startDate' }, 400);
   }
 
-  // Gist 데이터 로드
   let gist;
   try {
     gist = await loadGist(token, gistId);
@@ -48,9 +45,7 @@ export default async (req, context) => {
   const employees = gist.employees?.employees || [];
   const settings = gist.settings || {};
   const requestsData = gist.requests || { requests: [] };
-  const confirmLog = gist['confirm-log.json'] || gist.confirmLog || { confirmations: [] };
 
-  // 직원 매칭 (이메일 우선, 이름으로 보조)
   const employee = employees.find(e => e.email?.toLowerCase() === email.toLowerCase());
   if (!employee) {
     return json({ error: '등록되지 않은 직원입니다. 관리자에게 문의하세요.' }, 403);
@@ -59,7 +54,6 @@ export default async (req, context) => {
     return json({ error: '이름과 이메일이 일치하지 않습니다.' }, 403);
   }
 
-  // 잔여 연차 사전 검증
   const leaveInfo = calcRemaining(employee, requestsData.requests, settings);
   if (Number(days) > leaveInfo.remaining) {
     return json({
@@ -68,13 +62,15 @@ export default async (req, context) => {
     }, 400);
   }
 
-  // 토큰 생성
-  const confirmToken = crypto.randomBytes(32).toString('hex');
+  // Web Crypto API로 토큰 생성 (Edge runtime — Node crypto 미지원)
+  const tokenBytes = new Uint8Array(32);
+  crypto.getRandomValues(tokenBytes);
+  const confirmToken = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
   const validityDays = Number(settings.confirmTokenValidityDays) || 30;
   const now = new Date();
   const expiresAt = new Date(now.getTime() + validityDays * 86400 * 1000);
 
-  // 신청 객체 생성
   const reqId = `req-${formatYmd(now)}-${String(requestsData.requests.length + 1).padStart(3, '0')}`;
   const approvalMode = settings.approvalMode || 'manual';
   const status = approvalMode === 'auto' ? 'auto_approved' : 'pending';
@@ -107,16 +103,13 @@ export default async (req, context) => {
     emailsSent: []
   };
 
-  // 이메일 발송 분기
-  // 결재 흐름: 모든 신청 → 김은주 차장(adminEmail)이 처리.
-  // (settings.vicePresidentEmail은 책임자 메모용. 시스템 결재에는 사용하지 않음.)
+  // 이메일 발송: 모든 신청 → 김은주 차장(adminEmail). 일반팀원은 팀장 CC.
   const adminEmail = settings.adminEmail || 'eunju@eyepopeng.com';
-  const siteOrigin = `https://${process.env.SITE_NAME || 'eyepop-leave-management'}.netlify.app`;
-  const confirmUrl = `${siteOrigin}/.netlify/functions/confirm-token?t=${confirmToken}`;
+  const siteOrigin = process.env.SITE_ORIGIN || 'https://eyepop-leave-management.vercel.app';
+  const confirmUrl = `${siteOrigin}/api/confirm-token?t=${confirmToken}`;
 
   const emailResults = [];
   try {
-    // (1) 관리자(김은주) — 신청 알림. 일반 팀원은 팀장 CC 추가.
     const adminTo = adminEmail;
     const adminCc = !employee.isExecutive ? employee.teamLeaderEmail : null;
 
@@ -126,7 +119,6 @@ export default async (req, context) => {
     emailResults.push({ to: adminTo, role: 'admin', sentAt: r1.sentAt, messageId: r1.messageId });
     if (adminCc) emailResults.push({ to: adminCc, role: 'cc', sentAt: r1.sentAt });
 
-    // (2) 신청자 본인 — 접수/승인 확인 + 수신확인 링크
     const empSubject =
       status === 'auto_approved'
         ? `[연차 승인] ${startDate}~${endDate} 승인 알림`
@@ -142,7 +134,6 @@ export default async (req, context) => {
   requestsData.requests.push(newRequest);
   requestsData.updatedAt = now.toISOString();
 
-  // Gist 저장
   try {
     await saveGist(token, gistId, 'requests.json', requestsData);
   } catch (err) {
@@ -156,9 +147,9 @@ export default async (req, context) => {
     remainingAfter: leaveInfo.remaining - Number(days),
     emails: emailResults.map(e => ({ to: e.to, role: e.role }))
   });
-};
+}
 
-// ────────────────────── 헬퍼 ──────────────────────
+// ────────────────── 헬퍼 ──────────────────
 
 async function loadGist(token, gistId) {
   const resp = await fetch(`${GIST_API}/${gistId}`, {
@@ -222,9 +213,6 @@ function renderAdminMail({ employee, newRequest, leaveInfo }) {
       <tr><td style="padding:6px; background:#f5f7fa;">팀장 구두보고</td><td style="padding:6px;">${verbalReportConfirmed ? '✅ 확인' : '⚠️ 미확인'}</td></tr>
       <tr><td style="padding:6px; background:#f5f7fa;">잔여 (사용/총)</td><td style="padding:6px;">${leaveInfo.remaining}일 (${leaveInfo.used}/${leaveInfo.total})</td></tr>
     </table>
-    <p style="margin-top:16px; font-size:13px; color:#666;">
-      관리자 대시보드: <a href="https://eyepop-leave-management.netlify.app/admin.html">https://eyepop-leave-management.netlify.app/admin.html</a>
-    </p>
   </div>`;
 }
 
@@ -247,7 +235,7 @@ function renderEmployeeMail({ employee, newRequest, leaveInfo, confirmUrl, statu
     </p>
     <p style="font-size:13px; color:#666;">
       위 버튼을 1회 클릭해 주세요. 회사에 도달 사실이 기록됩니다.<br/>
-      유효기간: 30일. 클릭이 어려운 경우 경영기획실 김은주 차장에게 알려주세요.
+      유효기간: 30일.
     </p>
     <hr style="border:none; border-top:1px solid #eee; margin:24px 0;"/>
     <p style="font-size:12px; color:#999;">EYEPOP 연차관리 시스템 · 자동 발송 · 회신 불가</p>

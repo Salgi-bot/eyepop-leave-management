@@ -102,7 +102,7 @@
     submitBtn.textContent = '제출 중...';
 
     try {
-      const resp = await fetch('/.netlify/functions/submit-request', {
+      const resp = await fetch('/api/submit-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

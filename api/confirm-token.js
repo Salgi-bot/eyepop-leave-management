@@ -1,9 +1,9 @@
-// 수신확인 토큰 처리 Function
-// GET /.netlify/functions/confirm-token?t={token}
+// Vercel Edge Function — 수신확인 토큰 처리
+export const config = { runtime: 'edge' };
 
 const GIST_API = 'https://api.github.com/gists';
 
-export default async (req, context) => {
+export default async function handler(req) {
   const url = new URL(req.url);
   const token = url.searchParams.get('t');
 
@@ -31,22 +31,18 @@ export default async (req, context) => {
   const reqItem = requestsData.requests[idx];
   const now = new Date();
 
-  // 만료 체크
   if (new Date(reqItem.confirmTokenExpiresAt) < now) {
-    return htmlPage(410, '링크가 만료되었습니다',
-      `발송일로부터 30일이 지났습니다.<br/>경영기획실 김은주 차장에게 알려주세요.`);
+    return htmlPage(410, '링크가 만료되었습니다', '발송일로부터 30일이 지났습니다.<br/>경영기획실 김은주 차장에게 알려주세요.');
   }
 
-  // 이미 확인됨
   if (reqItem.confirmedAt) {
     return htmlPage(200, '이미 확인 완료',
       `${escapeHtml(reqItem.employeeName)}님, 이 신청은 이미 ${formatKst(reqItem.confirmedAt)} 기준으로 수신 확인되었습니다.`);
   }
 
-  // IP/UA 기록
   const ip =
-    req.headers.get('x-nf-client-connection-ip') ||
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
     'unknown';
   const userAgent = req.headers.get('user-agent') || '';
 
@@ -64,7 +60,6 @@ export default async (req, context) => {
   confirmLog.updatedAt = now.toISOString();
   requestsData.updatedAt = now.toISOString();
 
-  // 두 파일 동시 갱신 (병렬)
   try {
     await Promise.all([
       saveGist(ghToken, gistId, 'requests.json', requestsData),
@@ -79,9 +74,7 @@ export default async (req, context) => {
     기간: ${escapeHtml(reqItem.startDate)} ~ ${escapeHtml(reqItem.endDate)} (${reqItem.days}일)<br/><br/>
     감사합니다.`,
     '✅');
-};
-
-// ──────────────── 헬퍼 ────────────────
+}
 
 async function loadGist(token, gistId) {
   const resp = await fetch(`${GIST_API}/${gistId}`, {
