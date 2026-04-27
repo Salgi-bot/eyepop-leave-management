@@ -61,10 +61,11 @@ export default async function handler(req) {
   requestsData.updatedAt = now.toISOString();
 
   try {
-    await Promise.all([
-      saveGist(ghToken, gistId, 'requests.json', requestsData),
-      saveGist(ghToken, gistId, 'confirm-log.json', confirmLog)
-    ]);
+    // 한 번의 PATCH로 두 파일 동시 업데이트 (atomic, 409 충돌 회피)
+    await saveGistMultiple(ghToken, gistId, {
+      'requests.json': requestsData,
+      'confirm-log.json': confirmLog
+    });
   } catch (err) {
     return htmlPage(500, '저장 실패', err.message);
   }
@@ -98,7 +99,11 @@ async function loadGist(token, gistId) {
   return out;
 }
 
-async function saveGist(token, gistId, file, content) {
+async function saveGistMultiple(token, gistId, filesMap) {
+  const files = {};
+  for (const [name, content] of Object.entries(filesMap)) {
+    files[name] = { content: JSON.stringify(content, null, 2) };
+  }
   const resp = await fetch(`${GIST_API}/${gistId}`, {
     method: 'PATCH',
     headers: {
@@ -107,9 +112,7 @@ async function saveGist(token, gistId, file, content) {
       'Content-Type': 'application/json',
       'User-Agent': 'eyepop-leave-management'
     },
-    body: JSON.stringify({
-      files: { [file]: { content: JSON.stringify(content, null, 2) } }
-    })
+    body: JSON.stringify({ files })
   });
   if (!resp.ok) {
     const text = await resp.text();
