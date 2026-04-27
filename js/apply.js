@@ -18,6 +18,7 @@
 
   const TYPE_DAYS = {
     '연차': 1,
+    '3/4차': 0.75,
     '오전반차': 0.5,
     '오후반차': 0.5,
     '반반차': 0.25,
@@ -89,6 +90,7 @@
         <span class="entry-date">${label}</span>
         <select class="entry-type">
           <option value="연차" ${defaultType === '연차' ? 'selected' : ''}>연차 (1일)</option>
+          <option value="3/4차">3/4차 (0.75일)</option>
           <option value="오전반차">오전반차 (0.5일)</option>
           <option value="오후반차">오후반차 (0.5일)</option>
           <option value="반반차">반반차 (0.25일)</option>

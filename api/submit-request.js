@@ -33,7 +33,7 @@ export default async function handler(req) {
   }
 
   // entries 검증 + 서버에서 days 재계산 (클라이언트 신뢰 X)
-  const TYPE_DAYS = { '연차': 1, '오전반차': 0.5, '오후반차': 0.5, '반반차': 0.25 };
+  const TYPE_DAYS = { '연차': 1, '3/4차': 0.75, '오전반차': 0.5, '오후반차': 0.5, '반반차': 0.25 };
   if (!Array.isArray(entries) || entries.length === 0) {
     return json({ error: 'entries 배열이 비어 있습니다.' }, 400);
   }
