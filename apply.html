@@ -15,7 +15,14 @@
       <p class="apply-sub">EYEPOP 연차관리 시스템</p>
     </header>
 
-    <form id="applyForm" class="apply-form" autocomplete="off" novalidate>
+    <div id="startCard" class="start-card">
+      <button type="button" id="startApplyBtn" class="btn-primary btn-start" onclick="document.getElementById('startCard').style.display='none';document.getElementById('applyForm').style.display='';document.getElementById('name').focus();">
+        📝 연차 신청하기
+      </button>
+      <p class="start-hint">버튼을 누르면 신청 양식이 열립니다.</p>
+    </div>
+
+    <form id="applyForm" class="apply-form" autocomplete="off" novalidate style="display:none;">
       <div class="row">
         <label for="name">이름 <span class="req">*</span></label>
         <input type="text" id="name" required autocomplete="name" placeholder="홍길동">
@@ -82,8 +89,8 @@
       <button class="btn-primary" onclick="location.reload()">새 신청 작성</button>
     </div>
 
-    <details class="notice-box">
-      <summary>📢 이용 안내 (클릭하여 펼치기)</summary>
+    <section class="notice-box notice-static">
+      <h3 class="notice-title">📢 이용 안내</h3>
       <div class="notice-content">
         <p class="notice-lead">
           <b>시행일: 2026-05-01</b> · 임원 포함 전 임직원 대상<br/>
@@ -125,7 +132,7 @@
           ⚠ 신청 후 수신 메일의 <b>"수신 확인"</b> 버튼을 1회 클릭해주세요. 도달 사실 증명 용도입니다.
         </p>
       </div>
-    </details>
+    </section>
 
   </main>
 
