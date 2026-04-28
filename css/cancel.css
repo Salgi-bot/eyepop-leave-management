@@ -1,0 +1,124 @@
+/* cancel.css — 신청 철회 확인 페이지 */
+
+.cancel-card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 28px 24px;
+  text-align: center;
+}
+
+.cancel-card h3 {
+  margin: 16px 0 10px;
+  color: var(--navy);
+  font-size: 18px;
+}
+
+.cancel-card p { margin: 8px 0; color: #555; font-size: 14px; }
+.cancel-card .hint { font-size: 13px; color: var(--gray-400); }
+
+.cancel-status-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.cancel-info {
+  background: #fef9f0;
+  border: 1px solid #f0d9a8;
+  border-radius: 8px;
+  padding: 18px;
+  text-align: left;
+  margin-bottom: 18px;
+}
+.cancel-info-title {
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 10px;
+  text-align: center;
+  font-size: 15px;
+}
+.cancel-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.cancel-info-table td {
+  padding: 5px 8px;
+}
+.cancel-info-table td:first-child {
+  width: 70px;
+  color: var(--gray-400);
+}
+.cancel-info-table td:last-child b { color: var(--navy); font-size: 14px; }
+
+.cancel-card .row {
+  text-align: left;
+  margin: 16px 0;
+}
+.cancel-card label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 6px;
+}
+.cancel-card textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d4dae3;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.cancel-warn {
+  background: #fef2f2;
+  border-left: 3px solid #b93a3a;
+  padding: 12px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #6a2222;
+  margin: 16px 0;
+  text-align: left;
+  line-height: 1.7;
+}
+
+.cancel-card .actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.cancel-card .actions a,
+.cancel-card .actions button {
+  padding: 10px 22px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.cancel-card .btn-secondary {
+  background: white;
+  border: 1px solid #d4dae3;
+  color: var(--gray-800);
+}
+.cancel-card .btn-danger {
+  background: #b93a3a;
+  color: white;
+  border: none;
+}
+.cancel-card .btn-danger:hover { background: #9c2a2a; }
+.cancel-card .btn-danger:disabled { background: #d4a4a4; cursor: not-allowed; }
+
+.back-link {
+  margin-top: 18px;
+}
+.back-link a {
+  color: var(--gray-400);
+  text-decoration: none;
+  font-size: 13px;
+}
+.back-link a:hover { color: var(--navy); }

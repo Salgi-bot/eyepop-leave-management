@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>신청 철회 — EYEPOP 연차관리</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/apply.css">
+  <link rel="stylesheet" href="/css/cancel.css">
+</head>
+<body>
+  <main class="apply-container">
+    <header class="apply-header">
+      <h1>신청 철회</h1>
+      <p class="apply-sub">EYEPOP 연차관리 시스템</p>
+    </header>
+
+    <div id="errorBox" class="error-box" style="display:none;"></div>
+
+    <!-- 토큰 누락·오류 시 -->
+    <section id="invalidView" class="cancel-card" style="display:none;">
+      <div class="cancel-status-icon">⚠️</div>
+      <h3>유효하지 않은 링크</h3>
+      <p>철회 링크가 잘못되었거나 만료되었습니다.</p>
+      <p class="hint">신청 메일에서 다시 [신청 철회하기] 버튼을 클릭하시거나, 김은주 차장(eunju@eyepopeng.com)에게 연락해주세요.</p>
+      <p class="back-link"><a href="/">← 메인으로</a></p>
+    </section>
+
+    <!-- 철회 확인 -->
+    <section id="confirmView" class="cancel-card" style="display:none;">
+      <div class="cancel-info" id="reqInfo"></div>
+
+      <div class="row">
+        <label for="reasonInput">철회 사유 (선택)</label>
+        <textarea id="reasonInput" rows="2" placeholder="예: 일정 변경, 잘못 신청 등"></textarea>
+      </div>
+
+      <p class="cancel-warn">⚠ 철회를 확정하면 다음 작업이 즉시 처리됩니다:<br/>
+        · 신청 상태가 "철회"로 변경<br/>
+        · 본인·김은주 차장·팀장에게 알림 메일 자동 발송<br/>
+        · 잔여 연차 자동 재계산</p>
+
+      <div class="actions">
+        <a href="/" class="btn-secondary">취소 (메인으로)</a>
+        <button type="button" id="confirmBtn" class="btn-danger">철회 확정</button>
+      </div>
+    </section>
+
+    <!-- 완료 -->
+    <section id="successView" class="cancel-card" style="display:none;">
+      <div class="cancel-status-icon">✅</div>
+      <h3>철회가 완료되었습니다</h3>
+      <p id="successMsg">본인·관리자·팀장에게 메일이 발송되었습니다.</p>
+      <p class="back-link"><a href="/">← 메인으로</a></p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/js/app.js"></script>
+  <script src="/js/cancel.js"></script>
+</body>
+</html>

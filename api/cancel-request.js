@@ -20,14 +20,15 @@ export default async function handler(req) {
   let body;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
 
-  const sessionToken = body?.sessionToken;
-  const requestId = body?.requestId;
+  const cancelToken = body?.token;
   const cancelReason = (body?.reason || '').trim();
-  if (!sessionToken || !requestId) return json({ error: 'sessionToken, requestId 필수' }, 400);
+  if (!cancelToken) return json({ error: 'token 필수' }, 400);
 
-  const payload = await verifyToken(sessionToken, otpSecret);
-  if (!payload) return json({ error: '세션이 만료되었습니다. 본인 인증을 다시 진행해주세요.' }, 401);
-  if (payload.scope !== 'my-requests') return json({ error: '잘못된 토큰 종류' }, 401);
+  const payload = await verifyToken(cancelToken, otpSecret);
+  if (!payload) return json({ error: '철회 링크가 만료되었거나 유효하지 않습니다. 김은주 차장에게 연락해주세요.' }, 401);
+  if (payload.scope !== 'cancel') return json({ error: '잘못된 토큰 종류' }, 401);
+  const requestId = payload.requestId;
+  if (!requestId) return json({ error: '토큰에 신청 ID가 없습니다.' }, 400);
 
   let gist;
   try { gist = await loadGist(ghToken, gistId); }
@@ -38,8 +39,8 @@ export default async function handler(req) {
   const reqItem = requestsData.requests.find(r => r.id === requestId);
   if (!reqItem) return json({ error: '신청을 찾을 수 없습니다.' }, 404);
 
-  // 본인 소유 검증 (이메일 일치)
-  if (reqItem.employeeEmail?.toLowerCase() !== payload.email) {
+  // 본인 소유 검증 (토큰 발급 시 이메일과 신청 이메일 일치)
+  if (reqItem.employeeEmail?.toLowerCase() !== (payload.email || '').toLowerCase()) {
     return json({ error: '본인 신청만 철회 가능합니다.' }, 403);
   }
 

@@ -4,6 +4,7 @@ export const config = { runtime: 'edge' };
 import { sendEmail, escapeHtml } from '../lib/email.js';
 import { calcRemaining } from '../lib/leave-calc.js';
 import { containsProfanity } from '../lib/profanity-filter.js';
+import { signToken } from '../lib/otp-token.js';
 
 const GIST_API = 'https://api.github.com/gists';
 
@@ -159,6 +160,20 @@ export default async function handler(req) {
   const siteOrigin = process.env.SITE_ORIGIN || 'https://leave.eyepopeng.com';
   const confirmUrl = `${siteOrigin}/api/confirm-token?t=${confirmToken}`;
 
+  // 철회용 1회용 HMAC 토큰 (30일 유효, 메일 링크 전용)
+  const otpSecret = process.env.OTP_SECRET;
+  let cancelUrl = null;
+  if (otpSecret) {
+    const cancelToken = await signToken({
+      requestId: reqId,
+      email: employee.email.toLowerCase(),
+      scope: 'cancel',
+      startDate, endDate, days: computedDays,
+      leaveType: summaryType
+    }, otpSecret, 30 * 86400);
+    cancelUrl = `${siteOrigin}/cancel?t=${encodeURIComponent(cancelToken)}`;
+  }
+
   const emailResults = [];
   try {
     const adminTo = adminEmail;
@@ -174,7 +189,7 @@ export default async function handler(req) {
       status === 'auto_approved'
         ? `[연차 승인] ${startDate}~${endDate} 승인 알림`
         : `[연차 접수] ${startDate}~${endDate} 신청이 접수되었습니다`;
-    const empHtml = renderEmployeeMail({ employee, newRequest, leaveInfo, confirmUrl, status });
+    const empHtml = renderEmployeeMail({ employee, newRequest, leaveInfo, confirmUrl, cancelUrl, status });
     const r2 = await sendEmail({ to: employee.email, subject: empSubject, html: empHtml });
     emailResults.push({ to: employee.email, role: 'confirm', sentAt: r2.sentAt, messageId: r2.messageId });
   } catch (err) {
@@ -281,12 +296,14 @@ function renderAdminMail({ employee, newRequest, leaveInfo }) {
   </div>`;
 }
 
-function renderEmployeeMail({ employee, newRequest, leaveInfo, confirmUrl, status }) {
+function renderEmployeeMail({ employee, newRequest, leaveInfo, confirmUrl, cancelUrl, status }) {
   const { startDate, endDate, days, entries } = newRequest;
   const statusMsg =
     status === 'auto_approved'
       ? '연차 신청이 자동으로 <b>승인</b>되었습니다.'
       : '연차 신청이 <b>접수</b>되었습니다. 관리자 승인 후 안내 메일을 다시 보내드립니다.';
+  const cancelButton = cancelUrl ? `
+      <a href="${cancelUrl}" style="display:inline-block; padding:12px 24px; background:#fff; color:#b93a3a; text-decoration:none; border-radius:6px; font-weight:bold; border:2px solid #b93a3a; margin-left:8px;">❌ 신청 철회하기</a>` : '';
   return `
   <div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif; line-height:1.7; max-width:640px;">
     <h2 style="border-bottom:2px solid #4a90e2; padding-bottom:8px;">${escapeHtml(employee.name)}님</h2>
@@ -297,11 +314,11 @@ function renderEmployeeMail({ employee, newRequest, leaveInfo, confirmUrl, statu
     </table>
     ${renderEntriesTable(entries)}
     <p style="margin:24px 0;">
-      <a href="${confirmUrl}" style="display:inline-block; padding:12px 24px; background:#4a90e2; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">📩 수신 확인하기</a>
+      <a href="${confirmUrl}" style="display:inline-block; padding:12px 24px; background:#4a90e2; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">📩 수신 확인하기</a>${cancelButton}
     </p>
     <p style="font-size:13px; color:#666;">
-      위 버튼을 1회 클릭해 주세요. 회사에 도달 사실이 기록됩니다.<br/>
-      유효기간: 30일.
+      · <b>수신 확인</b>: 회사 도달 사실 기록 (1회 클릭, 유효 30일)<br/>
+      · <b>신청 철회</b>: 잘못 신청한 경우만 클릭 → 관리자·팀장에게 자동 통보 (유효 30일)
     </p>
     <hr style="border:none; border-top:1px solid #eee; margin:24px 0;"/>
     <p style="font-size:12px; color:#999;">EYEPOP 연차관리 시스템 · 자동 발송 · 회신 불가</p>
