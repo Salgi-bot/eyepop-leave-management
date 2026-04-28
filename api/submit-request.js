@@ -3,6 +3,7 @@ export const config = { runtime: 'edge' };
 
 import { sendEmail, escapeHtml } from '../lib/email.js';
 import { calcRemaining } from '../lib/leave-calc.js';
+import { containsProfanity } from '../lib/profanity-filter.js';
 
 const GIST_API = 'https://api.github.com/gists';
 
@@ -26,6 +27,9 @@ export default async function handler(req) {
   const { name, email, startDate, endDate, days, entries, leaveType, reason, verbalReportConfirmed } = body;
   if (!reason || reason.trim().length < 2) {
     return json({ error: '사유는 필수 입력입니다. (2자 이상)' }, 400);
+  }
+  if (containsProfanity(reason)) {
+    return json({ error: '사유에 부적절한 표현이 포함되어 있습니다. 다시 작성해주세요.' }, 400);
   }
 
   if (!name || !email || !startDate || !endDate) {
@@ -73,6 +77,25 @@ export default async function handler(req) {
   }
   if (employee.name && employee.name !== name) {
     return json({ error: '이름과 이메일이 일치하지 않습니다.' }, 403);
+  }
+
+  // Rate Limit: 동일 이메일 1분 이내 재신청 차단 + 일일 10건 한도
+  const sameEmailReqs = requestsData.requests
+    .filter(r => r.employeeEmail?.toLowerCase() === email.toLowerCase())
+    .sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+  if (sameEmailReqs.length > 0) {
+    const lastSubmittedAt = sameEmailReqs[0].submittedAt;
+    if (lastSubmittedAt) {
+      const elapsed = Date.now() - new Date(lastSubmittedAt).getTime();
+      if (elapsed < 60_000) {
+        return json({ error: '동일 이메일로 1분 이내 재신청 불가. 잠시 후 다시 시도하세요.' }, 429);
+      }
+    }
+  }
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayCount = sameEmailReqs.filter(r => (r.submittedAt || '').startsWith(todayStr)).length;
+  if (todayCount >= 10) {
+    return json({ error: '하루 신청 한도(10건)를 초과했습니다. 내일 다시 시도하세요.' }, 429);
   }
 
   const leaveInfo = calcRemaining(employee, requestsData.requests, settings);
