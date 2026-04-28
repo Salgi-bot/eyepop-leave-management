@@ -701,7 +701,8 @@
   }
 
   // ── 출퇴근 대조 (블록 D) ──
-  state.attendance = { rows: [], compared: [], filter: 'all' };
+  // byMonth: { 'YYYY-MM': { uploadedAt, rowCount, rows: [...] } } — Gist에 누적 저장
+  state.attendance = { byMonth: {}, rows: [], compared: [], filter: 'all' };
 
   const fileAttendance = document.getElementById('fileAttendance');
   document.getElementById('btnUploadAttendance').addEventListener('click', () => fileAttendance.click());
@@ -761,10 +762,44 @@
           outside: idx.outside >= 0 ? cleanCell(r[idx.outside]) : ''
         });
       }
-      state.attendance.rows = rows;
+      // 월별 그룹핑 → byMonth 갱신 (같은 월은 덮어쓰기, A안)
+      const newByMonth = {};
+      for (const row of rows) {
+        const m = (row.date || '').slice(0, 7);
+        if (!m) continue;
+        (newByMonth[m] ||= []).push(row);
+      }
+      const monthsAffected = Object.keys(newByMonth).sort();
+      const now = new Date().toISOString();
+      for (const m of monthsAffected) {
+        state.attendance.byMonth[m] = {
+          uploadedAt: now,
+          rowCount: newByMonth[m].length,
+          rows: newByMonth[m]
+        };
+      }
+
+      // 13개월 초과 자동 정리 (오늘 기준 직전 12개월 + 현재월 보존)
+      const removedMonths = pruneOldMonths(state.attendance.byMonth);
+      if (removedMonths.length > 0) {
+        EYEPOP.toast(`오래된 ${removedMonths.length}개월 자동 정리 (${removedMonths.join(', ')})`, 'success', 4000);
+      }
+
+      // Gist 누적 저장
+      try {
+        await EYEPOP.gist.write('attendance.json', {
+          months: state.attendance.byMonth,
+          updatedAt: now
+        });
+        EYEPOP.toast(`${rows.length}행 저장 완료 (${monthsAffected.join(', ')})`, 'success');
+      } catch (saveErr) {
+        EYEPOP.toast('서버 저장 실패: ' + saveErr.message, 'error', 5000);
+      }
+
+      // 모든 월 합쳐서 화면 갱신
+      state.attendance.rows = Object.values(state.attendance.byMonth).flatMap(v => v.rows || []);
       compareAttendance();
       renderAttendance();
-      EYEPOP.toast(`${rows.length}행 로드 완료`, 'success');
       fileAttendance.value = '';
     } catch (err) {
       console.error(err);
@@ -867,6 +902,21 @@
     state.attendance.compared = compared;
   }
 
+  // 13개월 초과 월 키 삭제 (오늘 기준 직전 12개월 + 현재월 보존)
+  function pruneOldMonths(byMonth) {
+    const now = new Date();
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+    const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}`;
+    const removed = [];
+    for (const m of Object.keys(byMonth)) {
+      if (m < cutoffKey) {
+        delete byMonth[m];
+        removed.push(m);
+      }
+    }
+    return removed.sort();
+  }
+
   function parseHHMM(s) {
     if (!s) return 0;
     const m = String(s).match(/(\d+):(\d+)/);
@@ -930,11 +980,13 @@
 
   function clearAttendance() {
     if (state.attendance.rows.length === 0) return;
-    if (!confirm('업로드한 SECOM 데이터를 초기화합니다.\n계속하시겠습니까?')) return;
-    state.attendance = { rows: [], compared: [], filter: 'all' };
+    if (!confirm('현재 화면만 비웁니다 (서버 누적 데이터는 유지).\n새로고침하면 서버 데이터로 다시 표시됩니다.\n계속하시겠습니까?')) return;
+    state.attendance.rows = [];
+    state.attendance.compared = [];
+    state.attendance.filter = 'all';
     document.getElementById('attFilter').value = 'all';
     renderAttendance();
-    EYEPOP.toast('초기화 완료', 'success');
+    EYEPOP.toast('화면 초기화 완료 (서버 데이터 유지)', 'success');
   }
 
   function downloadAttendanceResult() {
@@ -964,10 +1016,22 @@
       state.employees = (files['employees.json']?.employees) || [];
       state.requests = (files['requests.json']?.requests) || [];
       state.settings = files['settings.json'] || {};
+
+      // SECOM 출퇴근 누적 데이터 복원 (월별)
+      const att = files['attendance.json'];
+      if (att && att.months) {
+        state.attendance.byMonth = att.months;
+        state.attendance.rows = Object.values(att.months).flatMap(v => v.rows || []);
+      }
+
       applySettingsToForm(state.settings);
       renderEmployeeTable();
       renderRequestTable();
       renderPromotion();
+      if (state.attendance.rows.length > 0) {
+        compareAttendance();
+        renderAttendance();
+      }
     } catch (err) {
       console.error(err);
       EYEPOP.toast('데이터 로드 실패: ' + err.message, 'error', 5000);
