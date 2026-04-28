@@ -462,6 +462,25 @@
     await loadAll();
     EYEPOP.toast('새로고침 완료', 'success');
   });
+  document.getElementById('btnResetRequests').addEventListener('click', resetAllRequests);
+
+  async function resetAllRequests() {
+    const count = state.requests.length;
+    if (count === 0) {
+      EYEPOP.toast('삭제할 신청내역이 없습니다', 'warning');
+      return;
+    }
+    if (!confirm(`⚠️ 등록된 신청내역 ${count}건을 전부 삭제합니다.\n\n• 승인·반려·대기 모든 상태 포함\n• 사용된 연차 이력이 사라져 잔여 연차 계산이 초기화됨\n• 직원 명단(employees)은 그대로 유지\n• 이 작업은 되돌릴 수 없음 (Gist revision history로만 복구)\n\n계속하시겠습니까?`)) return;
+    if (!confirm(`정말 ${count}건 전원 삭제하시겠습니까?\n(마지막 확인)`)) return;
+    state.requests = [];
+    try {
+      await EYEPOP.gist.write('requests.json', { requests: [], updatedAt: new Date().toISOString() });
+      renderRequestTable();
+      EYEPOP.toast(`${count}건 신청내역 전원 삭제 완료`, 'success');
+    } catch (err) {
+      EYEPOP.toast('삭제 실패: ' + err.message, 'error');
+    }
+  }
 
   const STATUS_LABEL = {
     pending: '<span class="badge" style="background:#fff7e6; color:#c97a1a;">대기</span>',
@@ -726,6 +745,28 @@
   fileAttendance.addEventListener('change', handleAttendanceUpload);
   document.getElementById('btnClearAttendance').addEventListener('click', clearAttendance);
   document.getElementById('btnDownloadAttendance').addEventListener('click', downloadAttendanceResult);
+  document.getElementById('btnResetServerAttendance').addEventListener('click', resetServerAttendance);
+
+  async function resetServerAttendance() {
+    const monthCount = Object.keys(state.attendance.byMonth).length;
+    if (monthCount === 0) {
+      EYEPOP.toast('삭제할 서버 데이터가 없습니다', 'warning');
+      return;
+    }
+    const months = Object.keys(state.attendance.byMonth).sort();
+    if (!confirm(`⚠️ 서버에 누적된 SECOM 출퇴근 데이터를 전부 삭제합니다.\n\n• 대상: ${monthCount}개월치 (${months.join(', ')})\n• 삭제 후 같은 월 SECOM을 다시 업로드해야 대조 가능\n• 이 작업은 되돌릴 수 없음 (Gist revision history로만 복구)\n\n계속하시겠습니까?`)) return;
+    if (!confirm(`정말 ${monthCount}개월치 전부 삭제하시겠습니까?\n(마지막 확인)`)) return;
+    state.attendance.byMonth = {};
+    state.attendance.rows = [];
+    state.attendance.compared = [];
+    try {
+      await EYEPOP.gist.write('attendance.json', { months: {}, updatedAt: new Date().toISOString() });
+      renderAttendance();
+      EYEPOP.toast(`${monthCount}개월치 서버 데이터 삭제 완료`, 'success');
+    } catch (err) {
+      EYEPOP.toast('삭제 실패: ' + err.message, 'error');
+    }
+  }
   document.getElementById('attFilter').addEventListener('change', (e) => {
     state.attendance.filter = e.target.value;
     renderAttendance();

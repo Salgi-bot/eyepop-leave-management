@@ -64,6 +64,7 @@
               </select>
               <input type="text" id="reqSearch" placeholder="직원명·기간 검색">
               <button class="btn-secondary" id="btnReloadRequests">↻ 새로고침</button>
+              <button class="btn-danger" id="btnResetRequests">⚠ 신청내역 전체 삭제</button>
             </div>
             <div id="requestTableWrap">
               <div class="empty-state">신청 내역이 없습니다.</div>
@@ -133,7 +134,8 @@
                 <option value="normal">정상만</option>
               </select>
               <button class="btn-secondary" id="btnDownloadAttendance">결과 엑셀 다운로드</button>
-              <button class="btn-secondary" id="btnClearAttendance">초기화</button>
+              <button class="btn-secondary" id="btnClearAttendance">화면 초기화</button>
+              <button class="btn-danger" id="btnResetServerAttendance">⚠ 서버 데이터 전체 삭제</button>
             </div>
 
             <div id="attSummary" style="margin:14px 0;"></div>
