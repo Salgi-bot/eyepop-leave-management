@@ -1078,8 +1078,8 @@
           if (reqStatus === 'pending') { verdict = '🟡 신청 대기 (결근)'; level = 'warn'; }
           else { verdict = '정상 (연차)'; level = 'ok'; }
         } else if (secom) {
-          if (workH >= 8) {
-            // 정규화 8시간 이상 → 정상 출근
+          if (workH >= 7.5) {
+            // 정규화 7.5시간 이상 → 정상 출근 (30분 이내 어긋남은 정상 — 송혜진 케이스 포함)
             if (reqEntries.length > 0) {
               verdict = totalReqDays >= 1 ? '⚠ 신청 후 출근' : `⚠ 신청 후 출근 (${reqType})`;
               level = 'anomaly';
@@ -1154,7 +1154,8 @@
     let raw = Math.max(0, effOut - effIn);
     // 점심 11:45~12:45 (=11.75~12.75) 가 (effIn, effOut) 안에 걸칠 때만 1시간 차감
     if (effIn < 12.75 && effOut > 11.75) raw = Math.max(0, raw - 1);
-    const capped = Math.min(raw, 8);
+    // 7.5시간(=7h30m) 이상이면 08:00으로 캡 표기 — 30분 이내 어긋남은 정상 출근으로 간주 (송혜진 케이스 포함)
+    const capped = raw >= 7.5 ? 8 : raw;
     const hh = Math.floor(capped);
     const mm = Math.round((capped - hh) * 60);
     return { workHours: raw, normalizedDisplay: `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}` };
