@@ -50,11 +50,20 @@ export default async function handler(req) {
   try {
     const settings = gist.settings || {};
     const adminEmail = settings.adminEmail || 'eunju@eyepopeng.com';
-    const ccList = [adminEmail];
-    if (!reqItem.isExecutive && reqItem.teamLeaderEmail) ccList.push(reqItem.teamLeaderEmail);
+    // To/CC 중복 제거 (본인이 관리자/팀장인 경우 대비)
+    const empEmail = (reqItem.employeeEmail || '').toLowerCase();
+    const ccSet = new Set();
+    if (adminEmail && adminEmail.toLowerCase() !== empEmail) ccSet.add(adminEmail);
+    if (!reqItem.isExecutive && reqItem.teamLeaderEmail
+        && reqItem.teamLeaderEmail.toLowerCase() !== empEmail) {
+      ccSet.add(reqItem.teamLeaderEmail);
+    }
+    const ccList = Array.from(ccSet);
     const subject = `[연차 반려] ${reqItem.employeeName} ${reqItem.startDate}~${reqItem.endDate} 신청 반려 안내`;
     const html = renderRejectMail(reqItem);
-    const r = await sendEmail({ to: reqItem.employeeEmail, cc: ccList.join(', '), subject, html });
+    const sendOpts = { to: reqItem.employeeEmail, subject, html };
+    if (ccList.length > 0) sendOpts.cc = ccList.join(', ');
+    const r = await sendEmail(sendOpts);
     reqItem.emailsSent = reqItem.emailsSent || [];
     reqItem.emailsSent.push({ to: reqItem.employeeEmail, cc: ccList, role: 'reject', sentAt: r.sentAt, messageId: r.messageId });
   } catch (err) {
