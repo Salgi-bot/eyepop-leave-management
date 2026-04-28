@@ -9,10 +9,14 @@
   }
 
   // 토큰 페이로드 디코드 (서명 검증은 서버에서, 표시용)
+  // UTF-8 한글 처리: atob() 결과를 TextDecoder로 디코드
   let payload = null;
   try {
     const body = token.split('.')[0];
-    payload = JSON.parse(atob(body.replace(/-/g, '+').replace(/_/g, '/').padEnd(body.length + (4 - body.length % 4) % 4, '=')));
+    const padded = body.replace(/-/g, '+').replace(/_/g, '/').padEnd(body.length + (4 - body.length % 4) % 4, '=');
+    const bytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+    const json = new TextDecoder('utf-8').decode(bytes);
+    payload = JSON.parse(json);
   } catch {}
 
   if (!payload || payload.scope !== 'cancel') {
@@ -57,7 +61,11 @@
         body: JSON.stringify({ token, reason })
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      if (!r.ok) {
+        const msg = data.error || `HTTP ${r.status}`;
+        const detail = data.detail ? ` (${data.detail})` : '';
+        throw new Error(msg + detail);
+      }
       document.getElementById('confirmView').style.display = 'none';
       document.getElementById('successView').style.display = 'block';
       if (data.message) document.getElementById('successMsg').textContent = data.message;

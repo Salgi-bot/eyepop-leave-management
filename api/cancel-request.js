@@ -58,19 +58,23 @@ export default async function handler(req) {
   reqItem.previousStatus = prevStatus;
   requestsData.updatedAt = now;
 
-  // 메일 발송: 직원 To, 김은주 + 팀장 CC
+  // 메일 발송: 직원 To, 김은주 + 팀장 CC (To와 중복 제거)
   const adminEmail = settings.adminEmail || 'eunju@eyepopeng.com';
-  const ccList = [adminEmail];
-  if (!reqItem.isExecutive && reqItem.teamLeaderEmail) ccList.push(reqItem.teamLeaderEmail);
+  const empEmail = (reqItem.employeeEmail || '').toLowerCase();
+  const ccSet = new Set();
+  if (adminEmail && adminEmail.toLowerCase() !== empEmail) ccSet.add(adminEmail);
+  if (!reqItem.isExecutive && reqItem.teamLeaderEmail
+      && reqItem.teamLeaderEmail.toLowerCase() !== empEmail) {
+    ccSet.add(reqItem.teamLeaderEmail);
+  }
+  const ccList = Array.from(ccSet);
 
   try {
     const subject = `[연차 철회] ${reqItem.employeeName} ${reqItem.startDate}~${reqItem.endDate} (${reqItem.days}일)`;
     const html = renderCancelMail(reqItem, prevStatus);
-    const r = await sendEmail({
-      to: reqItem.employeeEmail,
-      cc: ccList.join(', '),
-      subject, html
-    });
+    const sendOpts = { to: reqItem.employeeEmail, subject, html };
+    if (ccList.length > 0) sendOpts.cc = ccList.join(', ');
+    const r = await sendEmail(sendOpts);
     reqItem.emailsSent = reqItem.emailsSent || [];
     reqItem.emailsSent.push({
       to: reqItem.employeeEmail, cc: ccList,
