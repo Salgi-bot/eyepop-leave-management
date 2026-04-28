@@ -1066,25 +1066,37 @@
         const reqStatus = reqEntries.length > 0 ? reqEntries[0].status : null;
         const totalReqDays = reqEntries.reduce((s, x) => s + (Number(x.days) || 0), 0);
 
+        // SECOM 시각 정규화 (9~18시 클램프 + 점심 11:45~12:45 차감)
+        const norm = secom ? normalizeWorkRange(secom.startTime, secom.endTime) : null;
+        const workH = norm ? norm.workHours : 0;
+        const display = norm ? norm.normalizedDisplay : '';
+
         let verdict, level;
-        if (secom && reqEntries.length === 0) {
-          verdict = '정상 (출근)'; level = 'ok';
-        } else if (!secom && reqEntries.length === 0) {
+        if (!secom && reqEntries.length === 0) {
           verdict = '⚠ 미신청 결근'; level = 'anomaly';
         } else if (!secom && reqEntries.length > 0) {
           if (reqStatus === 'pending') { verdict = '🟡 신청 대기 (결근)'; level = 'warn'; }
           else { verdict = '정상 (연차)'; level = 'ok'; }
-        } else if (secom && reqEntries.length > 0) {
-          // 출근 + 연차 신청 동시 → 반차/반반차/3/4차는 정상, 종일 연차면 이상
-          if (totalReqDays >= 1) { verdict = '⚠ 신청 후 출근'; level = 'anomaly'; }
-          else {
-            // 반차류 — 실제 근무시간으로 추정 검증
-            const wh = parseHHMM(secom.actualWork);
-            const expectedAbsent = totalReqDays * 8; // 8시간 = 1일
-            const expectedWork = 8 - expectedAbsent;
-            // 실제 근무가 예상 + 1.5시간 초과 시 의심
-            if (wh > expectedWork + 1.5) { verdict = `⚠ 반차 시간 의심 (${secom.actualWork} 근무, ${reqType})`; level = 'anomaly'; }
-            else { verdict = `정상 (${reqType})`; level = 'ok'; }
+        } else if (secom) {
+          if (workH >= 8) {
+            // 정규화 8시간 이상 → 정상 출근
+            if (reqEntries.length > 0) {
+              verdict = totalReqDays >= 1 ? '⚠ 신청 후 출근' : `⚠ 신청 후 출근 (${reqType})`;
+              level = 'anomaly';
+            } else {
+              verdict = '정상 (출근)'; level = 'ok';
+            }
+          } else {
+            // 8시간 미만 → 연차 사용 의심
+            const shortBy = 8 - workH;
+            if (reqEntries.length > 0) {
+              const expectedAbsent = totalReqDays * 8; // 1일=8h, 0.5일=4h, 0.25일=2h
+              const diff = Math.abs(shortBy - expectedAbsent);
+              if (diff <= 1) { verdict = `정상 (${reqType})`; level = 'ok'; }
+              else { verdict = `⚠ 시간 불일치 (실 ${display}, 신청 ${reqType})`; level = 'anomaly'; }
+            } else {
+              verdict = `⚠ 단축 근무·미신청 (실 ${display})`; level = 'anomaly';
+            }
           }
         }
 
@@ -1092,6 +1104,7 @@
           date: dt, name: emp.name, dept: emp.department || '',
           startTime: secom?.startTime || '', endTime: secom?.endTime || '',
           startJudge: secom?.startJudge || '', actualWork: secom?.actualWork || '',
+          actualWorkDisplay: display,
           reqType: reqType || '', reqStatus: reqStatus || '', reqDays: totalReqDays,
           verdict, level
         });
@@ -1120,6 +1133,31 @@
     const m = String(s).match(/(\d+):(\d+)/);
     if (!m) return 0;
     return Number(m[1]) + Number(m[2]) / 60;
+  }
+
+  // 시각 문자열("HH:MM" 또는 "YYYY-MM-DD HH:MM:SS") → 시간 단위 숫자 (오전 9:30 = 9.5)
+  function parseClockToHours(s) {
+    if (!s) return null;
+    const m = String(s).match(/(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return Number(m[1]) + Number(m[2]) / 60;
+  }
+
+  // 출퇴근 시각 → 09:00~18:00 클램프된 정규화 근무시간 (점심 11:45~12:45 자동 차감, 8시간 캡 표기)
+  // 부사장님 룰: 9시 이전·9:30까지 출근은 9시로 인정, 18시 이후 퇴근은 18시로 인정, 8시간 이상 근무는 08:00 표기
+  function normalizeWorkRange(startTime, endTime) {
+    const startH = parseClockToHours(startTime);
+    const endH = parseClockToHours(endTime);
+    if (startH == null || endH == null) return { workHours: 0, normalizedDisplay: '00:00' };
+    const effIn = startH <= 9.5 ? 9 : startH;
+    const effOut = endH >= 18 ? 18 : endH;
+    let raw = Math.max(0, effOut - effIn);
+    // 점심 11:45~12:45 (=11.75~12.75) 가 (effIn, effOut) 안에 걸칠 때만 1시간 차감
+    if (effIn < 12.75 && effOut > 11.75) raw = Math.max(0, raw - 1);
+    const capped = Math.min(raw, 8);
+    const hh = Math.floor(capped);
+    const mm = Math.round((capped - hh) * 60);
+    return { workHours: raw, normalizedDisplay: `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}` };
   }
 
   function renderAttendance() {
@@ -1158,7 +1196,7 @@
         <td>${EYEPOP.escapeHtml(c.dept)}</td>
         <td>${EYEPOP.escapeHtml(c.startTime.slice(11) || '-')}</td>
         <td>${EYEPOP.escapeHtml(c.endTime.slice(11) || '-')}</td>
-        <td>${EYEPOP.escapeHtml(c.actualWork || '-')}</td>
+        <td>${EYEPOP.escapeHtml(c.actualWorkDisplay || c.actualWork || '-')}</td>
         <td>${EYEPOP.escapeHtml(c.reqType || '-')}</td>
         <td style="font-weight:${c.level === 'anomaly' ? '700' : '400'}; color:${c.level === 'anomaly' ? '#b93a3a' : c.level === 'warn' ? '#c97a1a' : '#2e7d4f'};">${EYEPOP.escapeHtml(c.verdict)}</td>
       </tr>`;
@@ -1195,7 +1233,7 @@
     }
     const headers = ['날짜', '이름', '부서', '출근시간', '퇴근시간', '실근무', '연차신청', '신청상태', '판정'];
     const aoa = [headers, ...compared.map(c => [
-      c.date, c.name, c.dept, c.startTime, c.endTime, c.actualWork,
+      c.date, c.name, c.dept, c.startTime, c.endTime, c.actualWorkDisplay || c.actualWork,
       c.reqType, c.reqStatus, c.verdict
     ])];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
