@@ -154,7 +154,7 @@ export default async function handler(req) {
 
   // 이메일 발송: 모든 신청 → 김은주 차장(adminEmail). 일반팀원은 팀장 CC.
   const adminEmail = settings.adminEmail || 'eunju@eyepopeng.com';
-  const siteOrigin = process.env.SITE_ORIGIN || 'https://eyepop-leave-management.vercel.app';
+  const siteOrigin = process.env.SITE_ORIGIN || 'https://leave.eyepopeng.com';
   const confirmUrl = `${siteOrigin}/api/confirm-token?t=${confirmToken}`;
 
   const emailResults = [];

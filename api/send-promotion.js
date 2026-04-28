@@ -166,7 +166,7 @@ function renderFirstNotice({ emp, leave, year, deadline, senderName, senderEmail
     </div>
 
     <p style="margin:24px 0 6px;">
-      <a href="https://eyepop-leave-management.vercel.app/apply.html" style="display:inline-block; padding:10px 20px; background:#4a90e2; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">연차 신청 시스템 열기</a>
+      <a href="${process.env.SITE_ORIGIN || 'https://leave.eyepopeng.com'}/apply.html" style="display:inline-block; padding:10px 20px; background:#4a90e2; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">연차 신청 시스템 열기</a>
     </p>
     <p style="font-size:12px; color:#666;">시스템에 직접 신청하시면 회신을 대신할 수 있습니다.</p>
 
@@ -209,7 +209,7 @@ function renderSecondNotice({ emp, leave, year, deadline, senderName, senderEmai
     <p>지정 시기 변경이 필요하신 경우 즉시 ${escapeHtml(senderName)}(${escapeHtml(senderEmail)})에게 협의 요청해주십시오.</p>
 
     <p style="margin:24px 0 6px;">
-      <a href="https://eyepop-leave-management.vercel.app/apply.html" style="display:inline-block; padding:10px 20px; background:#4a90e2; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">연차 신청 시스템 열기</a>
+      <a href="${process.env.SITE_ORIGIN || 'https://leave.eyepopeng.com'}/apply.html" style="display:inline-block; padding:10px 20px; background:#4a90e2; color:#fff; text-decoration:none; border-radius:6px; font-weight:bold;">연차 신청 시스템 열기</a>
     </p>
 
     <hr style="border:none; border-top:1px solid #eee; margin:24px 0;"/>

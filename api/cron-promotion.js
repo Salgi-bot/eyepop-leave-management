@@ -9,7 +9,7 @@ export const config = { runtime: 'edge' };
 import { sendEmail, escapeHtml } from '../lib/email.js';
 
 const GIST_API = 'https://api.github.com/gists';
-const SITE_ORIGIN = 'https://eyepop-leave-management.vercel.app';
+const SITE_ORIGIN = process.env.SITE_ORIGIN || 'https://leave.eyepopeng.com';
 
 export default async function handler(req) {
   const url = new URL(req.url);
