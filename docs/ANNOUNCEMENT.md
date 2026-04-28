@@ -20,16 +20,10 @@
 
 ## 1. 시스템 접속
 
-### 📝 직원 — 연차 신청
 ```
 https://leave.eyepopeng.com
 ```
 주소만 입력하시면 바로 연차 신청 화면이 열립니다.
-
-### 🔐 관리자 — 관리 메뉴 (별도)
-```
-https://leave.eyepopeng.com/admin-login.html
-```
 
 PC·핸드폰 모두 접속 가능합니다. 즐겨찾기에 추가해두시면 편리합니다.
 
