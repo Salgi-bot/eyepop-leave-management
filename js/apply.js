@@ -19,11 +19,14 @@
   const TYPE_DAYS = {
     '연차': 1,
     '3/4차': 0.75,
-    '오전반차': 0.5,
-    '오후반차': 0.5,
+    '반차': 0.5,
+    '오전반차': 0.5,   // 호환: 기존 데이터 인식용
+    '오후반차': 0.5,   // 호환: 기존 데이터 인식용
     '반반차': 0.25,
     '없음': 0
   };
+  // 시간 입력 필요 타입 (반차·반반차)
+  const NEEDS_TIME = new Set(['반차', '반반차']);
 
   const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -91,12 +94,11 @@
         <select class="entry-type">
           <option value="연차" ${defaultType === '연차' ? 'selected' : ''}>연차 (1일)</option>
           <option value="3/4차">3/4차 (0.75일)</option>
-          <option value="오전반차">오전반차 (0.5일)</option>
-          <option value="오후반차">오후반차 (0.5일)</option>
-          <option value="반반차">반반차 (0.25일)</option>
+          <option value="반차">반차 (0.5일, 4시간 시간 입력)</option>
+          <option value="반반차">반반차 (0.25일, 2시간 시간 입력)</option>
           <option value="없음" ${defaultType === '없음' ? 'selected' : ''}>사용 안함 (0일)</option>
         </select>
-        <input type="text" class="entry-time" placeholder="13:00~15:00" style="display:none;">
+        <input type="text" class="entry-time" placeholder="09:00~14:00 (오전반차 시 점심 1시간 제외) 또는 14:00~18:00" style="display:none;">
       </div>`;
     }).join('');
 
@@ -104,8 +106,9 @@
       const select = row.querySelector('.entry-type');
       const time = row.querySelector('.entry-time');
       select.addEventListener('change', () => {
-        time.style.display = select.value === '반반차' ? 'block' : 'none';
-        if (select.value !== '반반차') time.value = '';
+        const needsTime = NEEDS_TIME.has(select.value);
+        time.style.display = needsTime ? 'block' : 'none';
+        if (!needsTime) time.value = '';
         recalcTotal();
       });
     });
@@ -134,7 +137,7 @@
           date: row.dataset.date,
           type,
           days: TYPE_DAYS[type],
-          timeRange: type === '반반차' ? timeRange : null
+          timeRange: NEEDS_TIME.has(type) ? timeRange : null
         };
       })
       .filter(Boolean);
@@ -204,10 +207,11 @@
       return;
     }
 
-    // 반반차 시간 검증
-    const missingTime = entries.find(e => e.type === '반반차' && !e.timeRange);
+    // 반차·반반차 시간 검증
+    const missingTime = entries.find(e => NEEDS_TIME.has(e.type) && !e.timeRange);
     if (missingTime) {
-      showError(`반반차(${missingTime.date})는 시간을 입력해 주세요. (예: 13:00~15:00)`);
+      const example = missingTime.type === '반차' ? '09:00~14:00 또는 14:00~18:00' : '13:00~15:00';
+      showError(`${missingTime.type}(${missingTime.date})는 시간을 입력해 주세요. (예: ${example})`);
       return;
     }
 

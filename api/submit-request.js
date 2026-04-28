@@ -40,7 +40,9 @@ export default async function handler(req) {
   }
 
   // entries 검증 + 서버에서 days 재계산 (클라이언트 신뢰 X)
-  const TYPE_DAYS = { '연차': 1, '3/4차': 0.75, '오전반차': 0.5, '오후반차': 0.5, '반반차': 0.25 };
+  // '반차' = 신규 통합 옵션, '오전반차'/'오후반차' = 기존 데이터 호환
+  const TYPE_DAYS = { '연차': 1, '3/4차': 0.75, '반차': 0.5, '오전반차': 0.5, '오후반차': 0.5, '반반차': 0.25 };
+  const NEEDS_TIME = new Set(['반차', '반반차']);
   if (!Array.isArray(entries) || entries.length === 0) {
     return json({ error: 'entries 배열이 비어 있습니다.' }, 400);
   }
@@ -51,8 +53,8 @@ export default async function handler(req) {
     if (!(ent.type in TYPE_DAYS)) {
       return json({ error: `유효하지 않은 종류: ${ent.type}` }, 400);
     }
-    if (ent.type === '반반차' && !ent.timeRange) {
-      return json({ error: `반반차(${ent.date})는 시간 입력 필수` }, 400);
+    if (NEEDS_TIME.has(ent.type) && !ent.timeRange) {
+      return json({ error: `${ent.type}(${ent.date})는 시간 입력 필수` }, 400);
     }
   }
   const computedDays = entries.reduce((s, e) => s + TYPE_DAYS[e.type], 0);
