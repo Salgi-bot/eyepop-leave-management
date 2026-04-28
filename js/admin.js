@@ -124,15 +124,32 @@
         const k = Object.keys(row).find(key => keywords.some(w => key.includes(w)));
         return k ? String(row[k] || '').trim() : '';
       }
+      function pickColRaw(row, keywords) {
+        const k = Object.keys(row).find(key => keywords.some(w => key.includes(w)));
+        return k ? row[k] : '';
+      }
       const parsed = rows.map(r => {
         const name = pickCol(r, ['이름']);
         const email = pickCol(r, ['이메일', '메일']);
         if (!name || !email) return null;
-        const hireOrDays = pickCol(r, ['입사일', '연차일수']);
-        const isDate = /^\d{4}-\d{2}-\d{2}$/.test(hireOrDays);
+
+        // 입사일 / 재입사일 (재입사일이 있으면 hireDate로 우선 사용 — A안: 재입사 시 근속 새로 시작)
+        const hireRaw = pickColRaw(r, ['입사일']);
+        const reHireRaw = pickColRaw(r, ['재입사']);
+        const hireDate = normalizeDate(reHireRaw) || normalizeDate(hireRaw);
+
+        // 직접 연차일수가 적힌 경우 (구버전 템플릿 호환)
+        const directDaysRaw = pickColRaw(r, ['연차일수']);
+        const directDays = (typeof directDaysRaw === 'number' && directDaysRaw < 100)
+          ? directDaysRaw
+          : (typeof directDaysRaw === 'string' && directDaysRaw && !isNaN(Number(directDaysRaw)))
+            ? Number(directDaysRaw)
+            : null;
+
         const execStr = pickCol(r, ['임원']).toUpperCase();
         const usedStr = pickCol(r, ['이미사용', '선반영', '기사용']);
         const usedNum = usedStr && !isNaN(Number(usedStr)) ? Number(usedStr) : null;
+
         return {
           id: EYEPOP.generateId(),
           name,
@@ -140,8 +157,8 @@
           department: pickCol(r, ['부서']),
           teamLeaderEmail: pickCol(r, ['팀장']),
           isExecutive: execStr === 'Y' || execStr === '예' || execStr === '임원',
-          hireDate: isDate ? hireOrDays : null,
-          customLeaveDays: (!isDate && hireOrDays) ? Number(hireOrDays) || null : null,
+          hireDate,
+          customLeaveDays: directDays,
           customUsedDays: usedNum
         };
       }).filter(Boolean);
@@ -807,9 +824,26 @@
     }
   }
 
-  function normalizeDate(s) {
-    // "2026/04/20" 또는 "2026-04-20" → "2026-04-20"
-    return s.replace(/\//g, '-').slice(0, 10);
+  // 다양한 입력(엑셀 시리얼·Date 객체·문자열) → "YYYY-MM-DD"
+  function normalizeDate(v) {
+    if (v == null || v === '') return null;
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return null;
+      const y = v.getFullYear();
+      const m = String(v.getMonth() + 1).padStart(2, '0');
+      const d = String(v.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    if (typeof v === 'number') {
+      if (v < 1 || v > 100000) return null;
+      const dc = (typeof XLSX !== 'undefined' && XLSX.SSF) ? XLSX.SSF.parse_date_code(v) : null;
+      if (!dc) return null;
+      return `${dc.y}-${String(dc.m).padStart(2,'0')}-${String(dc.d).padStart(2,'0')}`;
+    }
+    const s = String(v).trim();
+    const m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+    return null;
   }
 
   function compareAttendance() {
