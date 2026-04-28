@@ -1194,7 +1194,16 @@
     if (state.attendance.filter === 'anomaly') filtered = compared.filter(c => c.level === 'anomaly');
     else if (state.attendance.filter === 'normal') filtered = compared.filter(c => c.level === 'ok' || c.level === 'late');
 
-    const rows = filtered.map(c => {
+    // 월별 그룹핑 → 각 월 안에서 이름(가나다) → 날짜 순 정렬
+    const byMonth = {};
+    for (const c of filtered) {
+      const ym = (c.date || '').slice(0, 7);
+      if (!ym) continue;
+      (byMonth[ym] ||= []).push(c);
+    }
+    const months = Object.keys(byMonth).sort().reverse();  // 최근 월 먼저
+
+    const renderRow = (c) => {
       const bg = c.level === 'anomaly' ? 'background:#fef2f2;'
         : c.level === 'warn' ? 'background:#fef9ec;'
         : c.level === 'late' ? 'background:#e8f0fb;'
@@ -1214,18 +1223,33 @@
         <td>${EYEPOP.escapeHtml(c.reqType || '-')}</td>
         <td style="font-weight:${c.level === 'anomaly' || c.level === 'late' ? '600' : '400'}; color:${verdictColor};">${EYEPOP.escapeHtml(c.verdict)}</td>
       </tr>`;
+    };
+
+    const sections = months.map(ym => {
+      const items = byMonth[ym].slice().sort((a, b) => {
+        const n = a.name.localeCompare(b.name, 'ko');
+        return n !== 0 ? n : a.date.localeCompare(b.date);
+      });
+      // 월별 카운트
+      const mc = items.reduce((acc, c) => { acc[c.level] = (acc[c.level] || 0) + 1; return acc; }, {});
+      const monthLabel = `${ym.slice(0,4)}년 ${Number(ym.slice(5,7))}월`;
+      const detailLabel = `정상 ${mc.ok || 0} · 늦은퇴근 ${mc.late || 0} · 대기 ${mc.warn || 0} · 이상 ${mc.anomaly || 0}`;
+      return `
+        <h3 style="margin:18px 0 6px; font-size:14px; padding:8px 12px; background:#f5f7fa; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+          <span>📅 ${monthLabel} <small style="color:#9aa5b4; font-weight:400;">(${items.length}건)</small></span>
+          <small style="font-weight:400; color:#666;">${detailLabel}</small>
+        </h3>
+        <table>
+          <thead><tr>
+            <th>날짜</th><th>이름</th><th>부서</th>
+            <th>출근</th><th>퇴근</th><th>실근무</th>
+            <th>연차 신청</th><th>판정</th>
+          </tr></thead>
+          <tbody>${items.map(renderRow).join('')}</tbody>
+        </table>`;
     }).join('');
 
-    wrap.innerHTML = `
-      <table>
-        <thead><tr>
-          <th>날짜</th><th>이름</th><th>부서</th>
-          <th>출근</th><th>퇴근</th><th>실근무</th>
-          <th>연차 신청</th><th>판정</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      ${filtered.length === 0 ? '<div class="empty-state">필터 조건에 해당하는 행 없음</div>' : ''}`;
+    wrap.innerHTML = sections || '<div class="empty-state">필터 조건에 해당하는 행 없음</div>';
   }
 
   function clearAttendance() {
