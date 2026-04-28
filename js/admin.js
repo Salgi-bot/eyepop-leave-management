@@ -608,18 +608,30 @@
   }
   window.__rejectRequest = rejectRequest;
 
+  // ── 관리자 액션 통합 호출 (delete/edit/revert) — 직원 + 팀장 CC 메일 자동 발송 ──
+  async function callManageAPI(action, requestId, changes) {
+    const adminKey = localStorage.getItem('eyepop-admin-key');
+    const resp = await fetch('/api/manage-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+      body: JSON.stringify({ action, requestId, changes })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+    return data;
+  }
+
   // ── 신청내역 개별 삭제 ──
   async function deleteRequest(id) {
     const r = state.requests.find(x => x.id === id);
     if (!r) return;
-    if (!confirm(`⚠️ ${r.employeeName}님 ${r.startDate}~${r.endDate} (${r.days}일, ${STATUS_LABEL_TEXT[r.status] || r.status}) 신청을 삭제합니다.\n\n• 잔여 연차 계산이 자동 재집계됨\n• 직원에게 통보 메일은 발송되지 않음 (필요 시 별도 연락)\n• 되돌릴 수 없음 (Gist revision history로만 복구)\n\n계속하시겠습니까?`)) return;
-    state.requests = state.requests.filter(x => x.id !== id);
+    if (!confirm(`⚠️ ${r.employeeName}님 ${r.startDate}~${r.endDate} (${r.days}일, ${STATUS_LABEL_TEXT[r.status] || r.status}) 신청을 삭제합니다.\n\n• 잔여 연차 계산이 자동 재집계됨\n• 직원·팀장에게 통보 메일 자동 발송\n• 되돌릴 수 없음 (Gist revision history로만 복구)\n\n계속하시겠습니까?`)) return;
     try {
-      await EYEPOP.gist.write('requests.json', { requests: state.requests, updatedAt: new Date().toISOString() });
-      renderRequestTable();
-      EYEPOP.toast('삭제 완료', 'success');
+      await callManageAPI('delete', id);
+      await loadAll();
+      EYEPOP.toast('삭제 완료 (메일 발송됨)', 'success');
     } catch (err) {
-      EYEPOP.toast('삭제 실패: ' + err.message, 'error');
+      EYEPOP.toast('삭제 실패: ' + err.message, 'error', 5000);
     }
   }
   window.__deleteRequest = deleteRequest;
@@ -632,16 +644,13 @@
       EYEPOP.toast('승인된 신청만 취소 가능', 'warning');
       return;
     }
-    if (!confirm(`⚠️ ${r.employeeName}님 ${r.startDate}~${r.endDate} (${r.days}일) 승인을 취소합니다.\n\n• 상태가 '대기'로 복귀\n• 잔여 연차 계산에서 빠지고 다시 대기 일수에 포함\n• 직원에게 통보 메일은 발송되지 않음 (필요 시 별도 연락)\n\n계속하시겠습니까?`)) return;
-    r.status = 'pending';
-    r.approvedAt = null;
-    r.approvedBy = null;
+    if (!confirm(`⚠️ ${r.employeeName}님 ${r.startDate}~${r.endDate} (${r.days}일) 승인을 취소합니다.\n\n• 상태가 '대기'로 복귀\n• 잔여 연차 계산에서 빠지고 다시 대기 일수에 포함\n• 직원·팀장에게 통보 메일 자동 발송\n\n계속하시겠습니까?`)) return;
     try {
-      await EYEPOP.gist.write('requests.json', { requests: state.requests, updatedAt: new Date().toISOString() });
-      renderRequestTable();
-      EYEPOP.toast('승인 취소 완료 (대기 상태로 복귀)', 'success');
+      await callManageAPI('revert', id);
+      await loadAll();
+      EYEPOP.toast('승인 취소 완료 (메일 발송됨)', 'success');
     } catch (err) {
-      EYEPOP.toast('실패: ' + err.message, 'error');
+      EYEPOP.toast('실패: ' + err.message, 'error', 5000);
     }
   }
   window.__revertApproval = revertApproval;
@@ -688,29 +697,25 @@
       EYEPOP.toast('사유는 2자 이상', 'warning');
       return;
     }
-    const oldStatus = r.status;
-    r.reason = newReason;
-    if (newType) r.leaveType = newType;
-    r.status = newStatus;
-    if (newStatus === 'rejected') {
-      r.rejectReason = newRejectReason || r.rejectReason || '관리자 직접 수정';
-      r.rejectedAt = r.rejectedAt || new Date().toISOString();
+    // 변경된 항목만 changes에 담아 서버 API에 전송 (메일 자동 발송 + 팀장 CC)
+    const changes = {};
+    if (newReason !== (r.reason || '')) changes.reason = newReason;
+    if (newType && newType !== (r.leaveType || '')) changes.leaveType = newType;
+    if (newStatus !== r.status) changes.status = newStatus;
+    if (newStatus === 'rejected' && newRejectReason && newRejectReason !== (r.rejectReason || '')) {
+      changes.rejectReason = newRejectReason;
     }
-    if ((newStatus === 'approved' || newStatus === 'auto_approved') && oldStatus !== newStatus) {
-      r.approvedAt = r.approvedAt || new Date().toISOString();
-      r.approvedBy = r.approvedBy || 'admin-edit';
-    }
-    if (newStatus === 'pending') {
-      r.approvedAt = null;
-      r.approvedBy = null;
+    if (Object.keys(changes).length === 0) {
+      EYEPOP.toast('변경된 내용이 없습니다', 'warning');
+      return;
     }
     try {
-      await EYEPOP.gist.write('requests.json', { requests: state.requests, updatedAt: new Date().toISOString() });
+      await callManageAPI('edit', id, changes);
       closeEditRequestModal();
-      renderRequestTable();
-      EYEPOP.toast('수정 완료', 'success');
+      await loadAll();
+      EYEPOP.toast('수정 완료 (메일 발송됨)', 'success');
     } catch (err) {
-      EYEPOP.toast('수정 실패: ' + err.message, 'error');
+      EYEPOP.toast('수정 실패: ' + err.message, 'error', 5000);
     }
   });
 

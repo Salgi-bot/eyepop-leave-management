@@ -48,11 +48,15 @@ export default async function handler(req) {
   requestsData.updatedAt = now;
 
   try {
-    const subject = `[연차 반려] ${reqItem.startDate}~${reqItem.endDate} 신청 반려 안내`;
+    const settings = gist.settings || {};
+    const adminEmail = settings.adminEmail || 'eunju@eyepopeng.com';
+    const ccList = [adminEmail];
+    if (!reqItem.isExecutive && reqItem.teamLeaderEmail) ccList.push(reqItem.teamLeaderEmail);
+    const subject = `[연차 반려] ${reqItem.employeeName} ${reqItem.startDate}~${reqItem.endDate} 신청 반려 안내`;
     const html = renderRejectMail(reqItem);
-    const r = await sendEmail({ to: reqItem.employeeEmail, subject, html });
+    const r = await sendEmail({ to: reqItem.employeeEmail, cc: ccList.join(', '), subject, html });
     reqItem.emailsSent = reqItem.emailsSent || [];
-    reqItem.emailsSent.push({ to: reqItem.employeeEmail, role: 'reject', sentAt: r.sentAt, messageId: r.messageId });
+    reqItem.emailsSent.push({ to: reqItem.employeeEmail, cc: ccList, role: 'reject', sentAt: r.sentAt, messageId: r.messageId });
   } catch (err) {
     return json({ error: '반려 메일 발송 실패', detail: err.message }, 502);
   }
