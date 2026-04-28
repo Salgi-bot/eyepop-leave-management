@@ -1090,10 +1090,17 @@
             // 8시간 미만 → 연차 사용 의심
             const shortBy = 8 - workH;
             if (reqEntries.length > 0) {
-              const expectedAbsent = totalReqDays * 8; // 1일=8h, 0.5일=4h, 0.25일=2h
-              const diff = Math.abs(shortBy - expectedAbsent);
-              if (diff <= 1) { verdict = `정상 (${reqType})`; level = 'ok'; }
-              else { verdict = `⚠ 시간 불일치 (실 ${display}, 신청 ${reqType})`; level = 'anomaly'; }
+              const expectedAbsent = totalReqDays * 8; // 연차 8h, 반차 4h, 반반차 2h, 점심시간 제외
+              const expectedWorkH = 8 - expectedAbsent;
+              const overWork = workH - expectedWorkH; // 양수=야근(늦은 퇴근), 음수=결근 더
+              if (Math.abs(overWork) <= 0.5) {
+                verdict = `정상 (${reqType})`; level = 'ok';
+              } else if (overWork > 0.5 && overWork <= 1.5) {
+                // 1시간 이내 늦은 퇴근 → 흡수 (본인 판단으로 조금 늦게 퇴근)
+                verdict = `정상 (${reqType}, 1h 늦은 퇴근)`; level = 'late';
+              } else {
+                verdict = `⚠ 시간 불일치 (실 ${display}, 신청 ${reqType})`; level = 'anomaly';
+              }
             } else {
               verdict = `⚠ 단축 근무·미신청 (실 ${display})`; level = 'anomaly';
             }
@@ -1178,18 +1185,24 @@
       <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px;">
         <span>전체: <b>${compared.length}건</b></span>
         <span style="color:#2e7d4f;">정상: ${counts.ok || 0}건</span>
+        <span style="color:#1a73e8;">늦은 퇴근: ${counts.late || 0}건</span>
         <span style="color:#c97a1a;">대기: ${counts.warn || 0}건</span>
         <span style="color:#b93a3a; font-weight:600;">이상: ${counts.anomaly || 0}건</span>
       </div>`;
 
     let filtered = compared;
     if (state.attendance.filter === 'anomaly') filtered = compared.filter(c => c.level === 'anomaly');
-    else if (state.attendance.filter === 'normal') filtered = compared.filter(c => c.level === 'ok');
+    else if (state.attendance.filter === 'normal') filtered = compared.filter(c => c.level === 'ok' || c.level === 'late');
 
     const rows = filtered.map(c => {
       const bg = c.level === 'anomaly' ? 'background:#fef2f2;'
         : c.level === 'warn' ? 'background:#fef9ec;'
+        : c.level === 'late' ? 'background:#e8f0fb;'
         : '';
+      const verdictColor = c.level === 'anomaly' ? '#b93a3a'
+        : c.level === 'warn' ? '#c97a1a'
+        : c.level === 'late' ? '#1a73e8'
+        : '#2e7d4f';
       return `
       <tr style="${bg}">
         <td>${EYEPOP.escapeHtml(c.date)}</td>
@@ -1199,7 +1212,7 @@
         <td>${EYEPOP.escapeHtml(c.endTime.slice(11) || '-')}</td>
         <td>${EYEPOP.escapeHtml(c.actualWorkDisplay || c.actualWork || '-')}</td>
         <td>${EYEPOP.escapeHtml(c.reqType || '-')}</td>
-        <td style="font-weight:${c.level === 'anomaly' ? '700' : '400'}; color:${c.level === 'anomaly' ? '#b93a3a' : c.level === 'warn' ? '#c97a1a' : '#2e7d4f'};">${EYEPOP.escapeHtml(c.verdict)}</td>
+        <td style="font-weight:${c.level === 'anomaly' || c.level === 'late' ? '600' : '400'}; color:${verdictColor};">${EYEPOP.escapeHtml(c.verdict)}</td>
       </tr>`;
     }).join('');
 
