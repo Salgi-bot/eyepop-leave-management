@@ -513,12 +513,22 @@
       const confirmLabel = r.confirmedAt
         ? `<span title="${EYEPOP.escapeHtml(r.confirmedAt)}" style="color:#2e7d4f;">✓ 수신확인</span>`
         : '<span style="color:#9aa5b4;">미확인</span>';
-      const actionBtns = (r.status === 'pending')
-        ? `<button class="btn-primary btn-sm" onclick="__approveRequest('${r.id}')">승인</button>
-           <button class="btn-danger btn-sm" onclick="__rejectRequest('${r.id}')">반려</button>`
-        : (r.status === 'rejected'
-            ? `<span style="font-size:11px; color:#b93a3a;" title="${EYEPOP.escapeHtml(r.rejectReason || '')}">사유 보기</span>`
-            : '');
+      const actionBtns = (() => {
+        const btns = [];
+        if (r.status === 'pending') {
+          btns.push(`<button class="btn-primary btn-sm" onclick="__approveRequest('${r.id}')">승인</button>`);
+          btns.push(`<button class="btn-danger btn-sm" onclick="__rejectRequest('${r.id}')">반려</button>`);
+        }
+        if (r.status === 'approved' || r.status === 'auto_approved') {
+          btns.push(`<button class="btn-secondary btn-sm" onclick="__revertApproval('${r.id}')">승인취소</button>`);
+        }
+        if (r.status === 'rejected') {
+          btns.push(`<span style="font-size:11px; color:#b93a3a;" title="${EYEPOP.escapeHtml(r.rejectReason || '')}">사유 보기</span>`);
+        }
+        btns.push(`<button class="btn-secondary btn-sm" onclick="__editRequest('${r.id}')">수정</button>`);
+        btns.push(`<button class="btn-danger btn-sm" onclick="__deleteRequest('${r.id}')">삭제</button>`);
+        return btns.join(' ');
+      })();
       return `
         <tr data-id="${r.id}">
           <td>${EYEPOP.escapeHtml(r.employeeName)}<br><small style="color:#9aa5b4;">${EYEPOP.escapeHtml(r.department || '')}</small></td>
@@ -597,6 +607,119 @@
     }
   }
   window.__rejectRequest = rejectRequest;
+
+  // ── 신청내역 개별 삭제 ──
+  async function deleteRequest(id) {
+    const r = state.requests.find(x => x.id === id);
+    if (!r) return;
+    if (!confirm(`⚠️ ${r.employeeName}님 ${r.startDate}~${r.endDate} (${r.days}일, ${STATUS_LABEL_TEXT[r.status] || r.status}) 신청을 삭제합니다.\n\n• 잔여 연차 계산이 자동 재집계됨\n• 직원에게 통보 메일은 발송되지 않음 (필요 시 별도 연락)\n• 되돌릴 수 없음 (Gist revision history로만 복구)\n\n계속하시겠습니까?`)) return;
+    state.requests = state.requests.filter(x => x.id !== id);
+    try {
+      await EYEPOP.gist.write('requests.json', { requests: state.requests, updatedAt: new Date().toISOString() });
+      renderRequestTable();
+      EYEPOP.toast('삭제 완료', 'success');
+    } catch (err) {
+      EYEPOP.toast('삭제 실패: ' + err.message, 'error');
+    }
+  }
+  window.__deleteRequest = deleteRequest;
+
+  // ── 승인 취소 (approved → pending 복귀) ──
+  async function revertApproval(id) {
+    const r = state.requests.find(x => x.id === id);
+    if (!r) return;
+    if (r.status !== 'approved' && r.status !== 'auto_approved') {
+      EYEPOP.toast('승인된 신청만 취소 가능', 'warning');
+      return;
+    }
+    if (!confirm(`⚠️ ${r.employeeName}님 ${r.startDate}~${r.endDate} (${r.days}일) 승인을 취소합니다.\n\n• 상태가 '대기'로 복귀\n• 잔여 연차 계산에서 빠지고 다시 대기 일수에 포함\n• 직원에게 통보 메일은 발송되지 않음 (필요 시 별도 연락)\n\n계속하시겠습니까?`)) return;
+    r.status = 'pending';
+    r.approvedAt = null;
+    r.approvedBy = null;
+    try {
+      await EYEPOP.gist.write('requests.json', { requests: state.requests, updatedAt: new Date().toISOString() });
+      renderRequestTable();
+      EYEPOP.toast('승인 취소 완료 (대기 상태로 복귀)', 'success');
+    } catch (err) {
+      EYEPOP.toast('실패: ' + err.message, 'error');
+    }
+  }
+  window.__revertApproval = revertApproval;
+
+  // ── 신청 내용 수정 (사유·종류·상태) ──
+  const editRequestModal = document.getElementById('editRequestModal');
+  const editRequestForm = document.getElementById('editRequestForm');
+
+  editRequestModal.addEventListener('click', (e) => {
+    if (e.target.dataset.closeReq === '1') closeEditRequestModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !editRequestModal.classList.contains('hidden')) closeEditRequestModal();
+  });
+
+  function closeEditRequestModal() {
+    editRequestModal.classList.add('hidden');
+  }
+
+  function editRequest(id) {
+    const r = state.requests.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('editReq-id').value = r.id;
+    document.getElementById('editReq-info').textContent = `${r.employeeName} (${r.department || '-'})`;
+    document.getElementById('editReq-period').textContent = `${r.startDate} ~ ${r.endDate} · ${r.days}일`;
+    document.getElementById('editReq-leaveType').value = r.leaveType || '';
+    document.getElementById('editReq-status').value = r.status || 'pending';
+    document.getElementById('editReq-reason').value = r.reason || '';
+    document.getElementById('editReq-rejectReason').value = r.rejectReason || '';
+    editRequestModal.classList.remove('hidden');
+  }
+  window.__editRequest = editRequest;
+
+  editRequestForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editReq-id').value;
+    const r = state.requests.find(x => x.id === id);
+    if (!r) return;
+    const newReason = document.getElementById('editReq-reason').value.trim();
+    const newType = document.getElementById('editReq-leaveType').value.trim();
+    const newStatus = document.getElementById('editReq-status').value;
+    const newRejectReason = document.getElementById('editReq-rejectReason').value.trim();
+    if (newReason.length < 2) {
+      EYEPOP.toast('사유는 2자 이상', 'warning');
+      return;
+    }
+    const oldStatus = r.status;
+    r.reason = newReason;
+    if (newType) r.leaveType = newType;
+    r.status = newStatus;
+    if (newStatus === 'rejected') {
+      r.rejectReason = newRejectReason || r.rejectReason || '관리자 직접 수정';
+      r.rejectedAt = r.rejectedAt || new Date().toISOString();
+    }
+    if ((newStatus === 'approved' || newStatus === 'auto_approved') && oldStatus !== newStatus) {
+      r.approvedAt = r.approvedAt || new Date().toISOString();
+      r.approvedBy = r.approvedBy || 'admin-edit';
+    }
+    if (newStatus === 'pending') {
+      r.approvedAt = null;
+      r.approvedBy = null;
+    }
+    try {
+      await EYEPOP.gist.write('requests.json', { requests: state.requests, updatedAt: new Date().toISOString() });
+      closeEditRequestModal();
+      renderRequestTable();
+      EYEPOP.toast('수정 완료', 'success');
+    } catch (err) {
+      EYEPOP.toast('수정 실패: ' + err.message, 'error');
+    }
+  });
+
+  const STATUS_LABEL_TEXT = {
+    pending: '대기',
+    approved: '승인',
+    auto_approved: '자동승인',
+    rejected: '반려'
+  };
 
   // ── 사용 촉진 (블록 E) ──
   state.promoSelected = new Set();
