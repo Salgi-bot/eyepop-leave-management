@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>내 신청 조회·철회 — EYEPOP 연차관리</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/apply.css">
+  <link rel="stylesheet" href="/css/my-requests.css">
+</head>
+<body>
+  <main class="apply-container">
+    <header class="apply-header">
+      <h1>내 신청 조회·철회</h1>
+      <p class="apply-sub">EYEPOP 연차관리 시스템</p>
+    </header>
+
+    <div id="errorBox" class="error-box" style="display:none;"></div>
+
+    <!-- Step 1: 본인 정보 입력 -->
+    <section id="authStep1" class="start-card">
+      <h3 class="step-title">1단계 — 본인 확인</h3>
+      <div class="row">
+        <label for="authName">이름 <span class="req">*</span></label>
+        <input type="text" id="authName" placeholder="홍길동" autocomplete="name">
+      </div>
+      <div class="row">
+        <label for="authEmail">회사 이메일 <span class="req">*</span></label>
+        <input type="email" id="authEmail" placeholder="gildong@eyepopeng.com" autocomplete="email">
+        <small class="hint">관리자가 등록한 이메일과 일치해야 합니다.</small>
+      </div>
+      <button type="button" id="requestOtpBtn" class="btn-primary btn-start">📧 인증 코드 받기</button>
+      <p class="start-hint">입력하신 이메일로 6자리 인증 코드가 발송됩니다.</p>
+    </section>
+
+    <!-- Step 2: OTP 입력 -->
+    <section id="authStep2" class="start-card" style="display:none;">
+      <h3 class="step-title">2단계 — 인증 코드 입력</h3>
+      <p class="otp-info">📧 <span id="otpEmailHint"></span> 으로 발송된 6자리 코드를 입력하세요.</p>
+      <div class="row">
+        <label for="authOtp">인증 코드</label>
+        <input type="text" id="authOtp" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+        <small class="hint">유효 시간 5분. 메일이 안 오면 스팸함을 확인하세요.</small>
+      </div>
+      <div class="actions">
+        <button type="button" id="resendOtpBtn" class="btn-secondary">↻ 다시 받기</button>
+        <button type="button" id="verifyOtpBtn" class="btn-primary">확인</button>
+      </div>
+    </section>
+
+    <!-- Step 3: 신청 목록 -->
+    <section id="requestsView" class="requests-view" style="display:none;">
+      <div class="welcome-bar">
+        <span id="welcomeMsg"></span>
+        <button id="logoutBtn" class="btn-secondary btn-small">로그아웃</button>
+      </div>
+      <div id="requestsList" class="requests-list"></div>
+      <p class="back-link"><a href="/">← 메인으로 돌아가기</a></p>
+    </section>
+
+    <!-- 철회 확인 모달 -->
+    <div id="cancelModal" class="modal-overlay" style="display:none;">
+      <div class="modal-card">
+        <h3>신청 철회</h3>
+        <div id="cancelInfo" class="cancel-info"></div>
+        <div class="row">
+          <label for="cancelReason">철회 사유 (선택)</label>
+          <textarea id="cancelReason" rows="2" placeholder="예: 일정 변경, 잘못 신청 등"></textarea>
+        </div>
+        <p class="cancel-warn">⚠ 철회 시 본인·관리자·팀장에게 자동 메일이 발송됩니다.</p>
+        <input type="hidden" id="cancelTargetId">
+        <div class="actions">
+          <button type="button" id="cancelCancelBtn" class="btn-secondary">취소</button>
+          <button type="button" id="cancelConfirmBtn" class="btn-danger">철회 확정</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/js/app.js"></script>
+  <script src="/js/my-requests.js"></script>
+</body>
+</html>
