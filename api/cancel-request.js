@@ -104,7 +104,7 @@ function renderCancelMail(req, prevStatus) {
     <tr><td style="padding:8px; background:#f5f7fa;">사유</td><td style="padding:8px;">${escapeHtml(req.reason || '-')}</td></tr>
     <tr><td style="padding:8px; background:#f5f7fa;">철회 전 상태</td><td style="padding:8px;">${statusLabel}</td></tr>
     <tr><td style="padding:8px; background:#fef2f2;">철회 사유</td><td style="padding:8px; color:#b93a3a;">${escapeHtml(req.cancelReason)}</td></tr>
-    <tr><td style="padding:8px; background:#f5f7fa;">철회 시각</td><td style="padding:8px;">${escapeHtml(req.cancelledAt)}</td></tr>
+    <tr><td style="padding:8px; background:#f5f7fa;">철회 시각</td><td style="padding:8px;">${formatKST(req.cancelledAt)}</td></tr>
   </table>
 
   <p style="background:#f0f4f9; padding:12px; border-radius:6px; font-size:13px;">
@@ -138,6 +138,20 @@ async function saveGist(token, gistId, file, content) {
     body: JSON.stringify({ files: { [file]: { content: JSON.stringify(content, null, 2) } } })
   });
   if (!resp.ok) throw new Error(`Gist update ${resp.status}: ${await resp.text()}`);
+}
+
+function formatKST(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  // KST = UTC + 9
+  d.setUTCHours(d.getUTCHours() + 9);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const min = String(d.getUTCMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${min} (KST)`;
 }
 
 function json(body, status = 200) {
