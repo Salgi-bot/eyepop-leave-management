@@ -86,21 +86,26 @@ export default async function handler(req) {
 
   requestsData.updatedAt = new Date().toISOString();
 
-  // 메일 수신자: 직원 To, 김은주 + 팀장 CC (임원 아닐 때만 팀장 CC)
-  const ccList = [adminEmail];
-  if (!savedItem.isExecutive && savedItem.teamLeaderEmail) {
-    ccList.push(savedItem.teamLeaderEmail);
+  // 메일 수신자: 직원 To, 김은주 + 팀장 CC (To와 중복 제거)
+  const empEmail = (savedItem.employeeEmail || '').toLowerCase();
+  const ccSet = new Set();
+  if (adminEmail && adminEmail.toLowerCase() !== empEmail) ccSet.add(adminEmail);
+  if (!savedItem.isExecutive && savedItem.teamLeaderEmail
+      && savedItem.teamLeaderEmail.toLowerCase() !== empEmail) {
+    ccSet.add(savedItem.teamLeaderEmail);
   }
+  const ccList = Array.from(ccSet);
 
   let mailResult;
   try {
-    mailResult = await sendEmail({
+    const sendOpts = {
       to: savedItem.employeeEmail,
-      cc: ccList.join(', '),
       subject,
       html,
       replyTo: adminEmail
-    });
+    };
+    if (ccList.length > 0) sendOpts.cc = ccList.join(', ');
+    mailResult = await sendEmail(sendOpts);
   } catch (err) {
     return json({ error: '메일 발송 실패', detail: err.message }, 502);
   }
