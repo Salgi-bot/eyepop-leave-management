@@ -118,15 +118,16 @@
           <div class="card">
             <div style="background:#f5f7fa; padding:14px 18px; border-radius:8px; margin-bottom:18px; font-size:13px;">
               <b>기능 안내</b><br/>
-              • SECOM 출퇴근 엑셀 (.xls/.xlsx) 업로드 시 자동 파싱<br/>
+              • SECOM 출퇴근 엑셀 또는 <b>반반차(외출복귀) 엑셀</b> (.xls/.xlsx) 업로드 시 자동 분기 파싱<br/>
               • 같은 기간의 연차 신청과 자동 대조 → <b>이상치 강조 표시</b><br/>
-              • 이상치: 미신청 결근 / 연차 신청 후 출근 / 반차 시간 불일치<br/>
-              • 업로드한 SECOM 데이터는 <b>Gist에 월별 누적 저장</b> (같은 월 재업로드 시 덮어쓰기, 새로고침·재로그인 시 자동 복원)<br/>
+              • 이상치: 미신청 결근 / 연차 신청 후 출근 / 반차·반반차 시간 불일치<br/>
+              • 반반차 엑셀 업로드 시 외출~복귀 시간을 페어링하여 실근무시간에서 자동 차감<br/>
+              • 업로드한 데이터는 <b>Gist에 월별 누적 저장</b> (출퇴근/반반차 별도 키, 같은 월 재업로드 시 같은 종류만 덮어쓰기)<br/>
               • 보존 기간: <b>최근 13개월</b> (오늘 기준, 그 이전 월은 새 업로드 시 자동 삭제)
             </div>
 
             <div class="action-row">
-              <button class="btn-primary" id="btnUploadAttendance">SECOM 엑셀 업로드</button>
+              <button class="btn-primary" id="btnUploadAttendance">SECOM/반반차 엑셀 업로드</button>
               <input type="file" id="fileAttendance" accept=".xls,.xlsx" class="hidden">
               <select id="attFilter">
                 <option value="all">전체 표시</option>

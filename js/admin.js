@@ -865,8 +865,9 @@
   }
 
   // ── 출퇴근 대조 (블록 D) ──
-  // byMonth: { 'YYYY-MM': { uploadedAt, rowCount, rows: [...] } } — Gist에 누적 저장
-  state.attendance = { byMonth: {}, rows: [], compared: [], filter: 'all' };
+  // byMonth: { 'YYYY-MM': { uploadedAt, rowCount, rows: [...], outingsUpdatedAt, outings: [...] } } — Gist에 누적 저장
+  // rows: SECOM 출퇴근 / outings: 반반차(외출복귀) 페어 합산
+  state.attendance = { byMonth: {}, rows: [], outings: [], compared: [], filter: 'all' };
 
   const fileAttendance = document.getElementById('fileAttendance');
   document.getElementById('btnUploadAttendance').addEventListener('click', () => fileAttendance.click());
@@ -886,6 +887,7 @@
     if (!confirm(`정말 ${monthCount}개월치 전부 삭제하시겠습니까?\n(마지막 확인)`)) return;
     state.attendance.byMonth = {};
     state.attendance.rows = [];
+    state.attendance.outings = [];
     state.attendance.compared = [];
     try {
       await EYEPOP.gist.write('attendance.json', { months: {}, updatedAt: new Date().toISOString() });
@@ -913,77 +915,26 @@
         return;
       }
       const header = arr[0].map(h => String(h).replace(/^'|'$/g, '').trim());
-      const idx = {
-        date: header.findIndex(h => h.includes('근무일자')),
-        name: header.findIndex(h => h.includes('이름')),
-        org2: header.findIndex(h => h.includes('조직2')),
-        startTime: header.findIndex(h => h.includes('출근시간')),
-        endTime: header.findIndex(h => h.includes('퇴근시간')),
-        startJudge: header.findIndex(h => h.includes('출근판정')),
-        endJudge: header.findIndex(h => h.includes('퇴근판정')),
-        actualWork: header.findIndex(h => h.includes('실제근무시간')),
-        outside: header.findIndex(h => h.includes('외출여부'))
-      };
-      if (idx.date < 0 || idx.name < 0) {
-        EYEPOP.toast('SECOM 엑셀 형식이 아닙니다 (근무일자/이름 컬럼 누락)', 'error');
+
+      // 헤더로 자동 분기: '발생시간' + '상태' + '이름' → 반반차(외출복귀) 엑셀
+      const isOutingExcel = header.some(h => h.includes('발생시간')) &&
+                            header.some(h => h.includes('상태')) &&
+                            header.some(h => h.includes('이름'));
+      // SECOM 출퇴근: '근무일자' + '이름'
+      const isSecomExcel = header.some(h => h.includes('근무일자')) && header.some(h => h.includes('이름'));
+
+      if (isOutingExcel) {
+        await ingestOutingExcel(arr, header);
+      } else if (isSecomExcel) {
+        await ingestSecomExcel(arr, header);
+      } else {
+        EYEPOP.toast('지원하지 않는 엑셀 형식 (SECOM 출퇴근: 근무일자/이름, 반반차: 발생시간/상태/이름)', 'error');
         return;
-      }
-      const rows = [];
-      for (let i = 1; i < arr.length; i++) {
-        const r = arr[i];
-        if (!r || r.length === 0) continue;
-        const cleanCell = (v) => String(v ?? '').replace(/^'|'$/g, '').trim();
-        const dateRaw = cleanCell(r[idx.date]);
-        const name = cleanCell(r[idx.name]);
-        if (!dateRaw || !name) continue;
-        rows.push({
-          date: normalizeDate(dateRaw),
-          name,
-          org: idx.org2 >= 0 ? cleanCell(r[idx.org2]) : '',
-          startTime: idx.startTime >= 0 ? cleanCell(r[idx.startTime]) : '',
-          endTime: idx.endTime >= 0 ? cleanCell(r[idx.endTime]) : '',
-          startJudge: idx.startJudge >= 0 ? cleanCell(r[idx.startJudge]) : '',
-          endJudge: idx.endJudge >= 0 ? cleanCell(r[idx.endJudge]) : '',
-          actualWork: idx.actualWork >= 0 ? cleanCell(r[idx.actualWork]) : '',
-          outside: idx.outside >= 0 ? cleanCell(r[idx.outside]) : ''
-        });
-      }
-      // 월별 그룹핑 → byMonth 갱신 (같은 월은 덮어쓰기, A안)
-      const newByMonth = {};
-      for (const row of rows) {
-        const m = (row.date || '').slice(0, 7);
-        if (!m) continue;
-        (newByMonth[m] ||= []).push(row);
-      }
-      const monthsAffected = Object.keys(newByMonth).sort();
-      const now = new Date().toISOString();
-      for (const m of monthsAffected) {
-        state.attendance.byMonth[m] = {
-          uploadedAt: now,
-          rowCount: newByMonth[m].length,
-          rows: newByMonth[m]
-        };
-      }
-
-      // 13개월 초과 자동 정리 (오늘 기준 직전 12개월 + 현재월 보존)
-      const removedMonths = pruneOldMonths(state.attendance.byMonth);
-      if (removedMonths.length > 0) {
-        EYEPOP.toast(`오래된 ${removedMonths.length}개월 자동 정리 (${removedMonths.join(', ')})`, 'success', 4000);
-      }
-
-      // Gist 누적 저장
-      try {
-        await EYEPOP.gist.write('attendance.json', {
-          months: state.attendance.byMonth,
-          updatedAt: now
-        });
-        EYEPOP.toast(`${rows.length}행 저장 완료 (${monthsAffected.join(', ')})`, 'success');
-      } catch (saveErr) {
-        EYEPOP.toast('서버 저장 실패: ' + saveErr.message, 'error', 5000);
       }
 
       // 모든 월 합쳐서 화면 갱신
       state.attendance.rows = Object.values(state.attendance.byMonth).flatMap(v => v.rows || []);
+      state.attendance.outings = Object.values(state.attendance.byMonth).flatMap(v => v.outings || []);
       compareAttendance();
       renderAttendance();
       fileAttendance.value = '';
@@ -991,6 +942,137 @@
       console.error(err);
       EYEPOP.toast('엑셀 파싱 실패: ' + err.message, 'error');
     }
+  }
+
+  async function ingestSecomExcel(arr, header) {
+    const idx = {
+      date: header.findIndex(h => h.includes('근무일자')),
+      name: header.findIndex(h => h.includes('이름')),
+      org2: header.findIndex(h => h.includes('조직2')),
+      startTime: header.findIndex(h => h.includes('출근시간')),
+      endTime: header.findIndex(h => h.includes('퇴근시간')),
+      startJudge: header.findIndex(h => h.includes('출근판정')),
+      endJudge: header.findIndex(h => h.includes('퇴근판정')),
+      actualWork: header.findIndex(h => h.includes('실제근무시간')),
+      outside: header.findIndex(h => h.includes('외출여부'))
+    };
+    const rows = [];
+    for (let i = 1; i < arr.length; i++) {
+      const r = arr[i];
+      if (!r || r.length === 0) continue;
+      const cleanCell = (v) => String(v ?? '').replace(/^'|'$/g, '').trim();
+      const dateRaw = cleanCell(r[idx.date]);
+      const name = cleanCell(r[idx.name]);
+      if (!dateRaw || !name) continue;
+      rows.push({
+        date: normalizeDate(dateRaw),
+        name,
+        org: idx.org2 >= 0 ? cleanCell(r[idx.org2]) : '',
+        startTime: idx.startTime >= 0 ? cleanCell(r[idx.startTime]) : '',
+        endTime: idx.endTime >= 0 ? cleanCell(r[idx.endTime]) : '',
+        startJudge: idx.startJudge >= 0 ? cleanCell(r[idx.startJudge]) : '',
+        endJudge: idx.endJudge >= 0 ? cleanCell(r[idx.endJudge]) : '',
+        actualWork: idx.actualWork >= 0 ? cleanCell(r[idx.actualWork]) : '',
+        outside: idx.outside >= 0 ? cleanCell(r[idx.outside]) : ''
+      });
+    }
+    // 월별 그룹핑 → 같은 월의 rows만 덮어쓰기 (outings는 보존)
+    const newByMonth = {};
+    for (const row of rows) {
+      const m = (row.date || '').slice(0, 7);
+      if (!m) continue;
+      (newByMonth[m] ||= []).push(row);
+    }
+    const monthsAffected = Object.keys(newByMonth).sort();
+    const now = new Date().toISOString();
+    for (const m of monthsAffected) {
+      const prev = state.attendance.byMonth[m] || {};
+      state.attendance.byMonth[m] = {
+        ...prev,
+        uploadedAt: now,
+        rowCount: newByMonth[m].length,
+        rows: newByMonth[m]
+      };
+    }
+    pruneAndSave(monthsAffected, now, `SECOM ${rows.length}행`);
+  }
+
+  async function ingestOutingExcel(arr, header) {
+    const idx = {
+      time: header.findIndex(h => h.includes('발생시간')),
+      name: header.findIndex(h => h.includes('이름')),
+      state: header.findIndex(h => h.includes('상태'))
+    };
+    const events = [];
+    for (let i = 1; i < arr.length; i++) {
+      const r = arr[i];
+      if (!r || r.length === 0) continue;
+      const cleanCell = (v) => String(v ?? '').replace(/^'|'$/g, '').trim();
+      const timeStr = cleanCell(r[idx.time]);
+      const name = cleanCell(r[idx.name]);
+      if (!timeStr || !name) continue;
+      const m = String(timeStr).match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s+(\d{1,2}):(\d{1,2})/);
+      if (!m) continue;
+      const date = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+      const time = `${m[4].padStart(2,'0')}:${m[5].padStart(2,'0')}`;
+      events.push({ date, name, time });
+    }
+    // (날짜, 이름) 키 그룹핑 → 시간순 정렬 → 짝수 페어링
+    const byKey = new Map();
+    events.forEach(e => {
+      const k = `${e.date}|${e.name}`;
+      if (!byKey.has(k)) byKey.set(k, []);
+      byKey.get(k).push(e);
+    });
+    const allOutings = [];
+    for (const [k, evts] of byKey) {
+      evts.sort((a, b) => a.time.localeCompare(b.time));
+      const [date, name] = k.split('|');
+      const pairs = [];
+      let totalHours = 0;
+      for (let i = 0; i + 1 < evts.length; i += 2) {
+        const out = evts[i].time;
+        const back = evts[i+1].time;
+        const diff = Math.max(0, parseHHMM(back) - parseHHMM(out));
+        totalHours += diff;
+        pairs.push({ out, back, hours: diff });
+      }
+      if (pairs.length === 0) continue; // 홀수 1개만 있는 경우 무시
+      allOutings.push({ date, name, pairs, hours: totalHours });
+    }
+    // 월별 그룹핑 → 같은 월의 outings만 덮어쓰기 (rows는 보존)
+    const newByMonth = {};
+    for (const o of allOutings) {
+      const m = (o.date || '').slice(0, 7);
+      if (!m) continue;
+      (newByMonth[m] ||= []).push(o);
+    }
+    const monthsAffected = Object.keys(newByMonth).sort();
+    const now = new Date().toISOString();
+    for (const m of monthsAffected) {
+      const prev = state.attendance.byMonth[m] || {};
+      state.attendance.byMonth[m] = {
+        ...prev,
+        outingsUpdatedAt: now,
+        outings: newByMonth[m]
+      };
+    }
+    pruneAndSave(monthsAffected, now, `반반차 ${allOutings.length}건`);
+  }
+
+  function pruneAndSave(monthsAffected, now, summaryLabel) {
+    const removedMonths = pruneOldMonths(state.attendance.byMonth);
+    if (removedMonths.length > 0) {
+      EYEPOP.toast(`오래된 ${removedMonths.length}개월 자동 정리 (${removedMonths.join(', ')})`, 'success', 4000);
+    }
+    EYEPOP.gist.write('attendance.json', {
+      months: state.attendance.byMonth,
+      updatedAt: now
+    }).then(() => {
+      EYEPOP.toast(`${summaryLabel} 저장 완료 (${monthsAffected.join(', ')})`, 'success');
+    }).catch(saveErr => {
+      EYEPOP.toast('서버 저장 실패: ' + saveErr.message, 'error', 5000);
+    });
   }
 
   // 다양한 입력(엑셀 시리얼·Date 객체·문자열) → "YYYY-MM-DD"
@@ -1017,6 +1099,7 @@
 
   function compareAttendance() {
     const rows = state.attendance.rows;
+    const outings = state.attendance.outings || [];
     if (rows.length === 0) {
       state.attendance.compared = [];
       return;
@@ -1029,6 +1112,10 @@
     // SECOM (날짜+이름) 인덱스
     const secomIdx = new Map();
     rows.forEach(r => secomIdx.set(`${r.date}|${r.name}`, r));
+
+    // 반반차(외출복귀) (날짜+이름) 인덱스
+    const outingIdx = new Map();
+    outings.forEach(o => outingIdx.set(`${o.date}|${o.name}`, o));
 
     // 신청 (날짜+이름) 인덱스 — entries 기반
     const reqIdx = new Map();
@@ -1067,14 +1154,23 @@
         if (emp.name === '김홍정') continue; // 김홍정 부사장은 SECOM 미적용 (그 외 임원은 포함)
         const secom = secomIdx.get(`${dt}|${emp.name}`);
         const reqEntries = reqIdx.get(`${dt}|${emp.name}`) || [];
+        const outing = outingIdx.get(`${dt}|${emp.name}`);
         const reqType = reqEntries.length > 0 ? reqEntries.map(x => x.type).join('+') : null;
         const reqStatus = reqEntries.length > 0 ? reqEntries[0].status : null;
         const totalReqDays = reqEntries.reduce((s, x) => s + (Number(x.days) || 0), 0);
 
-        // SECOM 시각 정규화 (9~18시 클램프 + 점심 11:45~12:45 차감)
+        // SECOM 시각 정규화 (9~18시 클램프 + 점심 11:45~12:45 차감) → 외출 시간 차감
         const norm = secom ? normalizeWorkRange(secom.startTime, secom.endTime) : null;
-        const workH = norm ? norm.workHours : 0;
-        const display = norm ? norm.normalizedDisplay : '';
+        const rawWorkH = norm ? norm.workHours : 0;
+        const outingH = outing?.hours || 0;
+        const workH = Math.max(0, rawWorkH - outingH);
+        // 표기: 외출이 있으면 차감 후 시간을 그대로 표시, 없으면 기존 캡 표기 사용
+        const display = outing
+          ? formatHoursToHHMM(workH)
+          : (norm ? norm.normalizedDisplay : '');
+        const outingTag = outing
+          ? ` · 외출 ${outing.pairs.map(p => `${p.out}~${p.back}`).join(',')}`
+          : '';
 
         let verdict, level;
         if (!secom && reqEntries.length === 0) {
@@ -1086,26 +1182,27 @@
           if (workH >= 7.5) {
             // 정규화 7.5시간 이상 → 정상 출근 (30분 이내 어긋남은 정상 — 송혜진 케이스 포함)
             if (reqEntries.length > 0) {
-              verdict = totalReqDays >= 1 ? '⚠ 신청 후 출근' : `⚠ 신청 후 출근 (${reqType})`;
+              verdict = (totalReqDays >= 1 ? '⚠ 신청 후 출근' : `⚠ 신청 후 출근 (${reqType})`) + outingTag;
               level = 'anomaly';
             } else {
-              verdict = '정상 (출근)'; level = 'ok';
+              verdict = '정상 (출근)' + outingTag; level = 'ok';
             }
           } else {
-            // 8시간 미만 → 연차 사용 의심
-            const shortBy = 8 - workH;
+            // 8시간 미만 → 연차/반반차 사용 의심
             if (reqEntries.length > 0) {
               const expectedAbsent = totalReqDays * 8; // 연차 8h, 반차 4h, 반반차 2h, 점심시간 제외
               const expectedWorkH = 8 - expectedAbsent;
               const overWork = workH - expectedWorkH; // 양수=야근(늦은 퇴근), 음수=결근 더
               if (Math.abs(overWork) <= 0.5) {
-                verdict = `정상 (${reqType})`; level = 'ok';
+                verdict = `정상 (${reqType})` + outingTag; level = 'ok';
               } else if (overWork > 0.5 && overWork <= 1.5) {
                 // 1시간 이내 늦은 퇴근 → 흡수 (본인 판단으로 조금 늦게 퇴근)
-                verdict = `정상 (${reqType}, 1h 늦은 퇴근)`; level = 'late';
+                verdict = `정상 (${reqType}, 1h 늦은 퇴근)` + outingTag; level = 'late';
               } else {
-                verdict = `⚠ 시간 불일치 (실 ${display}, 신청 ${reqType})`; level = 'anomaly';
+                verdict = `⚠ 시간 불일치 (실 ${display}, 신청 ${reqType})` + outingTag; level = 'anomaly';
               }
+            } else if (outing) {
+              verdict = `⚠ 반반차 미신청 (실 ${display}${outingTag})`; level = 'anomaly';
             } else {
               verdict = `⚠ 단축 근무·미신청 (실 ${display})`; level = 'anomaly';
             }
@@ -1117,6 +1214,8 @@
           startTime: secom?.startTime || '', endTime: secom?.endTime || '',
           startJudge: secom?.startJudge || '', actualWork: secom?.actualWork || '',
           actualWorkDisplay: display,
+          outingHours: outingH,
+          outingPairs: outing?.pairs || [],
           reqType: reqType || '', reqStatus: reqStatus || '', reqDays: totalReqDays,
           verdict, level
         });
@@ -1153,6 +1252,14 @@
     const m = String(s).match(/(\d{1,2}):(\d{2})/);
     if (!m) return null;
     return Number(m[1]) + Number(m[2]) / 60;
+  }
+
+  // 시간(소수) → "HH:MM" 표기 (외출 차감 시 사용 — 캡 없음)
+  function formatHoursToHHMM(h) {
+    const safe = Math.max(0, Number(h) || 0);
+    const hh = Math.floor(safe);
+    const mm = Math.round((safe - hh) * 60);
+    return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
   }
 
   // 출퇴근 시각 → 09:00~18:00 클램프된 정규화 근무시간 (점심 11:45~12:45 자동 차감, 8시간 캡 표기)
@@ -1296,11 +1403,12 @@
       state.requests = (files['requests.json']?.requests) || [];
       state.settings = files['settings.json'] || {};
 
-      // SECOM 출퇴근 누적 데이터 복원 (월별)
+      // SECOM 출퇴근 + 반반차(외출복귀) 누적 데이터 복원 (월별)
       const att = files['attendance.json'];
       if (att && att.months) {
         state.attendance.byMonth = att.months;
         state.attendance.rows = Object.values(att.months).flatMap(v => v.rows || []);
+        state.attendance.outings = Object.values(att.months).flatMap(v => v.outings || []);
       }
 
       applySettingsToForm(state.settings);
