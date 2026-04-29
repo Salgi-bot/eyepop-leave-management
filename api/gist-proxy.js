@@ -78,9 +78,10 @@ async function handleRead(token, gistId, file) {
   if (file) {
     const f = data.files?.[file];
     if (!f) return json({ error: `File not found: ${file}` }, 404);
+    const fullContent = await fetchFullContent(token, f);
     let parsed;
     try {
-      parsed = JSON.parse(f.content);
+      parsed = JSON.parse(fullContent);
     } catch {
       return json({ error: `File is not valid JSON: ${file}` }, 500);
     }
@@ -89,13 +90,33 @@ async function handleRead(token, gistId, file) {
 
   const files = {};
   for (const [name, f] of Object.entries(data.files || {})) {
+    const fullContent = await fetchFullContent(token, f);
     try {
-      files[name] = JSON.parse(f.content);
+      files[name] = JSON.parse(fullContent);
     } catch {
       files[name] = null;
     }
   }
   return json({ files });
+}
+
+// Gist API는 단일 파일 1MB 초과 시 truncated:true로 content를 자름.
+// raw_url을 인증 헤더와 함께 다시 fetch 하면 원본 전체를 받을 수 있음.
+async function fetchFullContent(token, f) {
+  if (!f) return '';
+  if (!f.truncated || !f.raw_url) return f.content || '';
+  try {
+    const rawResp = await fetch(f.raw_url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'eyepop-leave-management'
+      }
+    });
+    if (!rawResp.ok) return f.content || '';
+    return await rawResp.text();
+  } catch {
+    return f.content || '';
+  }
 }
 
 async function handleWrite(token, gistId, file, content) {
