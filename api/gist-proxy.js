@@ -2,7 +2,7 @@
 export const config = { runtime: 'edge' };
 
 const GIST_API = 'https://api.github.com/gists';
-const ALLOWED_FILES = new Set(['employees.json', 'settings.json', 'requests.json', 'confirm-log.json']);
+const ALLOWED_FILES = new Set(['employees.json', 'settings.json', 'requests.json', 'confirm-log.json', 'attendance.json']);
 
 export default async function handler(req) {
   const token = process.env.GIST_TOKEN;

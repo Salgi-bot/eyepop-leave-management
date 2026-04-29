@@ -1033,7 +1033,7 @@
     // 신청 (날짜+이름) 인덱스 — entries 기반
     const reqIdx = new Map();
     requests.forEach(req => {
-      if (req.status === 'rejected') return;
+      if (req.status === 'rejected' || req.status === 'cancelled') return;
       const empName = req.employeeName;
       const entries = req.entries || [];
       if (entries.length > 0) {
