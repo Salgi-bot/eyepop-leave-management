@@ -151,6 +151,18 @@
   });
   endEl.addEventListener('change', rebuildEntries);
 
+  // 기타 선택 시 직접 입력란 표시
+  const reasonEtcEl = document.getElementById('reasonEtc');
+  reasonEl.addEventListener('change', () => {
+    if (reasonEl.value === '기타') {
+      reasonEtcEl.style.display = 'block';
+      reasonEtcEl.required = true;
+    } else {
+      reasonEtcEl.style.display = 'none';
+      reasonEtcEl.required = false;
+      reasonEtcEl.value = '';
+    }
+  });
 
   function showError(msg) {
     errorBox.textContent = msg;
@@ -176,7 +188,9 @@
       endDate: endEl.value,
       entries,
       days: totalDays,
-      reason: reasonEl.value.trim(),
+      reason: reasonEl.value === '기타'
+        ? ('기타: ' + (reasonEtcEl.value.trim()))
+        : reasonEl.value.trim(),
       verbalReportConfirmed: document.getElementById('verbalReportConfirmed').checked
     };
 
@@ -184,9 +198,14 @@
       showError('필수 항목을 모두 입력하세요.');
       return;
     }
-    if (!payload.reason) {
+    if (!reasonEl.value) {
       showError('사유를 선택하세요. (필수)');
       reasonEl.focus();
+      return;
+    }
+    if (reasonEl.value === '기타' && !reasonEtcEl.value.trim()) {
+      showError('기타 사유를 직접 입력해주세요.');
+      reasonEtcEl.focus();
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {

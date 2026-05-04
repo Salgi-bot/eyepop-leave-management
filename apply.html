@@ -63,12 +63,13 @@
         <label for="reason">사유 <span class="required">*</span></label>
         <select id="reason" required>
           <option value="" disabled selected>사유를 선택해주세요</option>
-          <option value="개인 사정">개인 사정</option>
-          <option value="병가">병가</option>
-          <option value="경조사">경조사</option>
-          <option value="연차 소진">연차 소진</option>
-          <option value="기타">기타</option>
+          <option value="병원 진료">병원 진료</option>
+          <option value="관공서·은행 업무">관공서·은행 업무</option>
+          <option value="가족 돌봄">가족 돌봄 (간호·자녀 등)</option>
+          <option value="여행·휴식">여행·휴식</option>
+          <option value="기타">기타 (직접 입력)</option>
         </select>
+        <input type="text" id="reasonEtc" maxlength="30" placeholder="사유를 직접 입력해주세요 (30자 이내)" style="display:none; margin-top:6px;">
       </div>
 
       <div class="row checkbox-row">
