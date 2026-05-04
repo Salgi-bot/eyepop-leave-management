@@ -31,7 +31,7 @@
       <div class="row">
         <label for="email">이메일 <span class="req">*</span></label>
         <input type="email" id="email" required autocomplete="email" placeholder="gildong@hanmail.net">
-        <small class="hint">관리자가 등록한 이메일과 일치해야 합니다.</small>
+        <small class="hint">회사의 공식 이메일을 입력해주세요. (관리자에게 사전 등록되어 있어야 합니다)</small>
       </div>
 
       <div class="row-2col">
@@ -61,8 +61,14 @@
 
       <div class="row">
         <label for="reason">사유 <span class="required">*</span></label>
-        <textarea id="reason" rows="3" minlength="2" maxlength="200" placeholder="개인 사유, 가족 행사 등 (필수)" required></textarea>
-        <small class="hint warn">⚠️ 건강·의료 관련 민감정보는 입력하지 마세요.</small>
+        <select id="reason" required>
+          <option value="" disabled selected>사유를 선택해주세요</option>
+          <option value="개인 사정">개인 사정</option>
+          <option value="병가">병가</option>
+          <option value="경조사">경조사</option>
+          <option value="연차 소진">연차 소진</option>
+          <option value="기타">기타</option>
+        </select>
       </div>
 
       <div class="row checkbox-row">

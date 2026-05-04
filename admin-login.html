@@ -27,12 +27,68 @@
   <script>
     const ADMIN_PW = '0494';
     const ADMIN_KEY = 'd2442d2946b8abc75f5f4226ed28c26a';
+    const RATE_KEY = 'eyepop-admin-ratelimit';
+    const MAX_ATTEMPTS = 5;
+    const LOCK_DURATION_MS = 10 * 60 * 1000; // 10분
+
     const form = document.getElementById('loginForm');
     const errMsg = document.getElementById('errorMsg');
+
+    function getRateLimit() {
+      try {
+        return JSON.parse(localStorage.getItem(RATE_KEY)) || { attempts: 0, lockedAt: null };
+      } catch (e) {
+        return { attempts: 0, lockedAt: null };
+      }
+    }
+
+    function setRateLimit(data) {
+      localStorage.setItem(RATE_KEY, JSON.stringify(data));
+    }
+
+    function isLocked() {
+      const rl = getRateLimit();
+      if (rl.lockedAt === null) return false;
+      const elapsed = Date.now() - rl.lockedAt;
+      if (elapsed >= LOCK_DURATION_MS) {
+        // 잠금 해제 — 초기화
+        setRateLimit({ attempts: 0, lockedAt: null });
+        return false;
+      }
+      return true;
+    }
+
+    function remainingMinutes() {
+      const rl = getRateLimit();
+      if (!rl.lockedAt) return 0;
+      const remaining = LOCK_DURATION_MS - (Date.now() - rl.lockedAt);
+      return Math.ceil(remaining / 60000);
+    }
+
+    function showError(msg) {
+      errMsg.textContent = msg;
+      errMsg.classList.add('show');
+    }
+
+    // 페이지 로드 시 잠금 상태 확인
+    if (isLocked()) {
+      document.getElementById('pw').disabled = true;
+      document.querySelector('.btn-primary').disabled = true;
+      showError('잠금 해제까지 ' + remainingMinutes() + '분 남았습니다.');
+    }
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
+
+      if (isLocked()) {
+        showError('잠금 해제까지 ' + remainingMinutes() + '분 남았습니다.');
+        return;
+      }
+
       const pw = document.getElementById('pw').value;
       if (pw === ADMIN_PW) {
+        // 로그인 성공 — Rate Limit 초기화
+        setRateLimit({ attempts: 0, lockedAt: null });
         localStorage.setItem('eyepop-admin-session', JSON.stringify({
           loggedIn: true,
           loginAt: Date.now()
@@ -40,7 +96,17 @@
         localStorage.setItem('eyepop-admin-key', ADMIN_KEY);
         location.href = '/admin.html';
       } else {
-        errMsg.classList.add('show');
+        const rl = getRateLimit();
+        const newAttempts = rl.attempts + 1;
+        if (newAttempts >= MAX_ATTEMPTS) {
+          setRateLimit({ attempts: newAttempts, lockedAt: Date.now() });
+          document.getElementById('pw').disabled = true;
+          document.querySelector('.btn-primary').disabled = true;
+          showError('로그인 시도 횟수를 초과했습니다. 잠금 해제까지 10분 남았습니다.');
+        } else {
+          setRateLimit({ attempts: newAttempts, lockedAt: null });
+          showError('비밀번호가 일치하지 않습니다. (' + newAttempts + '/' + MAX_ATTEMPTS + '회)');
+        }
         document.getElementById('pw').value = '';
       }
     });

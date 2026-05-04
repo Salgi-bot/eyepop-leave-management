@@ -151,15 +151,6 @@
   });
   endEl.addEventListener('change', rebuildEntries);
 
-  // 민감정보 단어 경고
-  const SENSITIVE = ['병원', '진단', '수술', '치료', '암', '우울', '정신', '약', '입원'];
-  reasonEl.addEventListener('blur', () => {
-    const v = reasonEl.value || '';
-    const hit = SENSITIVE.find(w => v.includes(w));
-    if (hit) {
-      EYEPOP.toast(`⚠️ 민감정보 단어 감지("${hit}") — 일반적 표현 권장`, 'warning', 4000);
-    }
-  });
 
   function showError(msg) {
     errorBox.textContent = msg;
@@ -193,8 +184,8 @@
       showError('필수 항목을 모두 입력하세요.');
       return;
     }
-    if (!payload.reason || payload.reason.length < 2) {
-      showError('사유를 입력하세요. (필수, 2자 이상)');
+    if (!payload.reason) {
+      showError('사유를 선택하세요. (필수)');
       reasonEl.focus();
       return;
     }
