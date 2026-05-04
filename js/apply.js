@@ -203,11 +203,6 @@
       reasonEl.focus();
       return;
     }
-    if (reasonEl.value === '기타' && !reasonEtcEl.value.trim()) {
-      showError('기타 사유를 직접 입력해주세요.');
-      reasonEtcEl.focus();
-      return;
-    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
       showError('이메일 형식이 올바르지 않습니다.');
       return;
