@@ -149,7 +149,7 @@
 }
 .entry-row {
   display: grid;
-  grid-template-columns: 100px 1fr 140px;
+  grid-template-columns: 90px 1fr 240px;
   gap: 8px;
   align-items: center;
   background: white;

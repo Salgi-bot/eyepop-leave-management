@@ -632,6 +632,19 @@
     }
   });
 
+  // 시작일 기본값: 오늘 (단, 16시 이후엔 내일)
+  (function initDefaultStartDate() {
+    if (startEl.value) return;
+    const now = new Date();
+    if (now.getHours() >= 16) now.setDate(now.getDate() + 1);
+    const ymd = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+    startEl.value = ymd;
+    if (!endEl.value) endEl.value = ymd;
+    rebuildEntries();
+  })();
+
   // 초기 버튼 상태
   updateSubmitState();
 })();
