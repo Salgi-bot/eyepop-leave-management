@@ -49,11 +49,23 @@ export default async function handler(req) {
     if (employeeDry.name && employeeDry.name !== name) {
       return json({ error: '이름과 이메일이 일치하지 않습니다.' }, 403);
     }
+    // 잔여 연차 계산 (본인 확인 통과 후만 노출)
+    const requestsDataDry = gistDry.requests || { requests: [] };
+    const settingsDry = gistDry.settings || {};
+    let leaveInfoDry;
+    try {
+      leaveInfoDry = calcRemaining(employeeDry, requestsDataDry.requests, settingsDry);
+    } catch {
+      leaveInfoDry = { remaining: null, used: null, total: null };
+    }
     return json({
       ok: true,
       employeeId: employeeDry.id,
       name: employeeDry.name,
-      department: employeeDry.department || ''
+      department: employeeDry.department || '',
+      remaining: leaveInfoDry.remaining,
+      used: leaveInfoDry.used,
+      total: leaveInfoDry.total
     }, 200);
   }
 

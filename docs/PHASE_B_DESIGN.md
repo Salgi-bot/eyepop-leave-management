@@ -160,7 +160,7 @@ Phase A 기본 + Phase B에서 추가:
 (유효기간: 1개월. 클릭 시 회사에 도달 사실이 기록됩니다)
 
 [수신 확인하기]
-→ https://eyepop-leave-management.netlify.app/confirm?t=a1b2c3...
+→ https://leave.eyepopeng.com/confirm?t=a1b2c3...
 
 ※ 확인 버튼 클릭이 어려운 경우 경영기획실 김은주 차장에게 알려주세요.
 
@@ -366,7 +366,7 @@ function calcRemaining(employee, requests) {
 - Netlify Functions 기본 Rate Limit: 분당 100회 (무료 플랜)
 - submit-request: IP당 분당 5회 제한
 - confirm-token: 동일 토큰 3회 이상 재시도 시 차단
-- CORS: `https://eyepop-leave-management.netlify.app` 동일 도메인만
+- CORS: `https://leave.eyepopeng.com` 동일 도메인만
 
 ---
 
@@ -513,16 +513,16 @@ function compare(secomRecords, leaveRequests) {
 근로기준법 제61조에 따라 다음 조치가 필요합니다.
 
 ☐ 1. SECOM 출퇴근 파일 대조 확인
-     https://eyepop-leave-management.netlify.app/admin#compare
+     https://leave.eyepopeng.com/admin#compare
 
 ☐ 2. 미사용 연차 현황 조회
-     https://eyepop-leave-management.netlify.app/admin#unused
+     https://leave.eyepopeng.com/admin#unused
 
 ☐ 3. 대상 직원 촉진 안내 메일 일괄 발송
-     https://eyepop-leave-management.netlify.app/admin#promotion
+     https://leave.eyepopeng.com/admin#promotion
 
 [일괄 업무 시작하기]
-→ https://eyepop-leave-management.netlify.app/admin#promotion-1st
+→ https://leave.eyepopeng.com/admin#promotion-1st
 
 ※ 2차 통지는 2026-10-31까지 완료되어야 합니다.
 ```

@@ -169,7 +169,7 @@
       const data = await resp.json();
       if (mySeq !== dryRunSeq) return; // 최신 요청만 반영
       if (resp.ok) {
-        const result = { state: 'ok', message: '', employee: { id: data.employeeId, name: data.name, department: data.department } };
+        const result = { state: 'ok', message: '', employee: { id: data.employeeId, name: data.name, department: data.department, remaining: data.remaining, total: data.total } };
         dryRunCache.set(key, result);
         dryRunStatus = result;
       } else {
@@ -233,7 +233,13 @@
     if (dryMsgBox) {
       if (dryRunStatus.state === 'ok' && dryRunStatus.employee) {
         dryMsgBox.className = 'dryrun-msg dryrun-ok';
-        dryMsgBox.textContent = `✓ ${dryRunStatus.employee.name}${dryRunStatus.employee.department ? ` (${dryRunStatus.employee.department})` : ''} 확인 완료`;
+        const emp = dryRunStatus.employee;
+        const parts = [emp.name];
+        if (emp.department) parts.push(emp.department);
+        if (emp.remaining != null) parts.push(`잔여 ${emp.remaining}일`);
+        dryMsgBox.textContent = parts.length > 1
+          ? `✓ ${parts[0]} (${parts.slice(1).join(', ')}) 확인 완료`
+          : `✓ ${parts[0]} 확인 완료`;
         dryMsgBox.style.display = 'block';
       } else if (dryRunStatus.state === 'fail') {
         dryMsgBox.className = 'dryrun-msg dryrun-fail';
@@ -472,6 +478,11 @@
     if (!email) reasons.push('이메일 미입력');
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) reasons.push('이메일 형식 오류');
     if (!startEl.value) reasons.push('시작일 미선택');
+    else {
+      const now = new Date();
+      const todayYmd = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      if (startEl.value < todayYmd) reasons.push('시작일이 과거 날짜');
+    }
     if (!endEl.value) reasons.push('종료일 미선택');
     if (!reasonEl.value) reasons.push('사유 미선택');
 
@@ -576,7 +587,7 @@
         let target = null;
         if (reasons.includes('이름 미입력')) target = nameEl;
         else if (reasons.includes('이메일 미입력') || reasons.includes('이메일 형식 오류')) target = emailEl;
-        else if (reasons.includes('시작일 미선택')) target = startEl;
+        else if (reasons.includes('시작일 미선택') || reasons.includes('시작일이 과거 날짜')) target = startEl;
         else if (reasons.includes('종료일 미선택')) target = endEl;
         else if (reasons.includes('사용 내역 미선택') || reasons.includes('시간 입력 미완료') || reasons.includes('시간-휴가 정합성 불일치')) target = entriesList;
         else if (reasons.includes('사유 미선택')) target = reasonEl;
@@ -650,6 +661,17 @@
       successBox.style.display = 'block';
       successBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (window.EYEPOP && EYEPOP.toast) EYEPOP.toast('신청 완료', 'success');
+      // 동의 체크박스 따라 localStorage 저장/제거
+      try {
+        const rememberEl = document.getElementById('rememberMe');
+        if (rememberEl && rememberEl.checked) {
+          localStorage.setItem('eyepop-leave-remember-name', payload.name);
+          localStorage.setItem('eyepop-leave-remember-email', payload.email);
+        } else {
+          localStorage.removeItem('eyepop-leave-remember-name');
+          localStorage.removeItem('eyepop-leave-remember-email');
+        }
+      } catch (e) { /* localStorage 차단 환경 무시 */ }
       showMailCheckModal();
     } catch (err) {
       showError('네트워크 오류: ' + err.message);
@@ -659,7 +681,7 @@
     }
   });
 
-  // 신청 완료 후 수신 확인 안내 모달 (60초 자동 닫힘)
+  // 신청 완료 후 수신 확인 안내 모달 (60초 자동 닫힘, Esc로 닫기 가능)
   function showMailCheckModal() {
     const modal = document.getElementById('mailCheckModal');
     const countdownEl = document.getElementById('modalCountdown');
@@ -668,18 +690,28 @@
     let remaining = 60;
     countdownEl.textContent = remaining;
     modal.style.display = 'flex';
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') {
+        clearInterval(timer);
+        modal.style.display = 'none';
+        document.removeEventListener('keydown', onKey);
+      }
+    };
+    document.addEventListener('keydown', onKey);
     const timer = setInterval(() => {
       remaining--;
       countdownEl.textContent = remaining;
       if (remaining <= 0) {
         clearInterval(timer);
         modal.style.display = 'none';
+        document.removeEventListener('keydown', onKey);
       }
     }, 1000);
     if (closeBtn) {
       closeBtn.onclick = () => {
         clearInterval(timer);
         modal.style.display = 'none';
+        document.removeEventListener('keydown', onKey);
       };
     }
   }
@@ -695,6 +727,21 @@
     startEl.value = ymd;
     if (!endEl.value) endEl.value = ymd;
     rebuildEntries();
+  })();
+
+  // 저장된 이름·이메일 자동 채움 + 동의 체크박스 ON + dryRun 자동 호출
+  (function loadRememberedUser() {
+    try {
+      const savedName = localStorage.getItem('eyepop-leave-remember-name');
+      const savedEmail = localStorage.getItem('eyepop-leave-remember-email');
+      const rememberEl = document.getElementById('rememberMe');
+      if (savedName && savedEmail) {
+        nameEl.value = savedName;
+        emailEl.value = savedEmail;
+        if (rememberEl) rememberEl.checked = true;
+        scheduleDryRun();
+      }
+    } catch (e) { /* localStorage 차단 환경 무시 */ }
   })();
 
   // 초기 버튼 상태
