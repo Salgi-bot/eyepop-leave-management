@@ -56,6 +56,25 @@
     if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
     return h * 60 + mm;
   }
+  // 24시간 형식 자동 보정: "14"→"14:00", "1430"→"14:30", "9"→"09:00", "9:30"→"09:30"
+  function autoFormatTime(raw) {
+    if (!raw) return '';
+    const digits = String(raw).replace(/\D/g, '');
+    if (!digits) return '';
+    let h, mm;
+    if (digits.length <= 2) {
+      h = parseInt(digits, 10);
+      mm = 0;
+    } else if (digits.length === 3) {
+      h = parseInt(digits.slice(0, 1), 10);
+      mm = parseInt(digits.slice(1), 10);
+    } else {
+      h = parseInt(digits.slice(0, 2), 10);
+      mm = parseInt(digits.slice(2, 4), 10);
+    }
+    if (isNaN(h) || isNaN(mm) || h < 0 || h > 23 || mm < 0 || mm > 59) return raw;
+    return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+  }
   function minToHHMM(min) {
     const m = Math.max(0, Math.min(24 * 60 - 1, Math.round(min)));
     const h = Math.floor(m / 60);
@@ -276,7 +295,7 @@
           <option value="없음" ${defaultType === '없음' ? 'selected' : ''}>사용 안함 (0일)</option>
         </select>
         <div class="entry-time-wrap" style="display:none;">
-          <input type="time" class="entry-time-start" step="300" placeholder="시작">
+          <input type="text" class="entry-time-start" inputmode="numeric" maxlength="5" placeholder="예: 14:00">
           <span class="entry-time-sep">~</span>
           <input type="text" class="entry-time-end" readonly tabindex="-1" placeholder="종료(자동)">
         </div>
@@ -311,6 +330,7 @@
         updateSubmitState();
       });
       startInput.addEventListener('blur', () => {
+        startInput.value = autoFormatTime(startInput.value);
         recalcEntryEnd(row);
         validateEntries();
         updateSubmitState();
