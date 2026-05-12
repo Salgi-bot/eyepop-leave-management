@@ -208,7 +208,7 @@
     if (dryMsgBox) {
       if (dryRunStatus.state === 'ok' && dryRunStatus.employee) {
         dryMsgBox.className = 'dryrun-msg dryrun-ok';
-        dryMsgBox.textContent = `✓ ${dryRunStatus.employee.name} (${dryRunStatus.employee.department || '부서 미지정'}) 확인 완료`;
+        dryMsgBox.textContent = `✓ ${dryRunStatus.employee.name}${dryRunStatus.employee.department ? ` (${dryRunStatus.employee.department})` : ''} 확인 완료`;
         dryMsgBox.style.display = 'block';
       } else if (dryRunStatus.state === 'fail') {
         dryMsgBox.className = 'dryrun-msg dryrun-fail';
