@@ -150,6 +150,22 @@
 
   </main>
 
+  <div id="mailCheckModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-icon">⚠</div>
+      <h2 class="modal-title">신청 접수 완료</h2>
+      <p class="modal-message">
+        지금 이메일을 확인하여 <b>"수신 확인"</b> 버튼을 클릭해 주세요.<br/>
+        메일 도착까지 1~2분 걸릴 수 있습니다. (스팸함도 확인)
+      </p>
+      <div class="modal-timer">⏱ 남은 시간 <span id="modalCountdown">60</span>초</div>
+      <div class="modal-actions">
+        <a href="https://mail.daum.net/" target="_blank" rel="noopener" class="btn-primary">📧 메일함 열기</a>
+        <button type="button" id="modalCloseBtn" class="btn-secondary">지금 닫기</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
   <script src="/js/app.js"></script>
   <script src="/js/apply.js"></script>

@@ -650,6 +650,7 @@
       successBox.style.display = 'block';
       successBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (window.EYEPOP && EYEPOP.toast) EYEPOP.toast('신청 완료', 'success');
+      showMailCheckModal();
     } catch (err) {
       showError('네트워크 오류: ' + err.message);
     } finally {
@@ -657,6 +658,31 @@
       updateSubmitState();
     }
   });
+
+  // 신청 완료 후 수신 확인 안내 모달 (60초 자동 닫힘)
+  function showMailCheckModal() {
+    const modal = document.getElementById('mailCheckModal');
+    const countdownEl = document.getElementById('modalCountdown');
+    const closeBtn = document.getElementById('modalCloseBtn');
+    if (!modal || !countdownEl) return;
+    let remaining = 60;
+    countdownEl.textContent = remaining;
+    modal.style.display = 'flex';
+    const timer = setInterval(() => {
+      remaining--;
+      countdownEl.textContent = remaining;
+      if (remaining <= 0) {
+        clearInterval(timer);
+        modal.style.display = 'none';
+      }
+    }, 1000);
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        clearInterval(timer);
+        modal.style.display = 'none';
+      };
+    }
+  }
 
   // 시작일 기본값: 오늘 (단, 16시 이후엔 내일)
   (function initDefaultStartDate() {

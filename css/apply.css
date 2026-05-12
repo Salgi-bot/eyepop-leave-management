@@ -482,3 +482,87 @@
 .notice-static .notice-content {
   display: block;
 }
+
+/* 신청 완료 모달 (수신 확인 안내) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+.modal-box {
+  background: white;
+  border-radius: 14px;
+  padding: 28px 24px 24px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.25);
+  text-align: center;
+  animation: modalIn .18s ease-out;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+.modal-icon {
+  font-size: 44px;
+  line-height: 1;
+}
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 10px 0 12px;
+  color: var(--navy, #1a3a6e);
+}
+.modal-message {
+  color: var(--gray-800, #333);
+  line-height: 1.55;
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+.modal-timer {
+  background: #fff5f5;
+  border: 1px solid #f5b5b5;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #555;
+  margin: 0 0 18px;
+}
+.modal-timer #modalCountdown {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--danger, #d94545);
+  margin: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.modal-actions .btn-primary,
+.modal-actions .btn-secondary {
+  padding: 11px 18px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  display: inline-block;
+}
+.modal-actions .btn-primary {
+  background: var(--navy, #1a3a6e);
+  color: white;
+}
+.modal-actions .btn-secondary {
+  background: #ececec;
+  color: #333;
+}
