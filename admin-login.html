@@ -94,6 +94,8 @@
           loginAt: Date.now()
         }));
         localStorage.setItem('eyepop-admin-key', ADMIN_KEY);
+        // 24시간 만료 timestamp 저장 (getAdminKey 헬퍼와 짝)
+        localStorage.setItem('eyepop-admin-key-expires', String(Date.now() + 24 * 60 * 60 * 1000));
         location.href = '/admin.html';
       } else {
         const rl = getRateLimit();

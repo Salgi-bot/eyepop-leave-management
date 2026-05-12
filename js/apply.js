@@ -129,13 +129,24 @@
   }
 
   // ─────────── 사전검증(dryRun) 상태 ───────────
-  const dryRunCache = new Map();   // key: `${name}|${email}` → { status, error?, employee? }
+  const dryRunCache = new Map();   // key: `${name}|${email}` → { status, error?, employee?, cachedAt }
+  const DRYRUN_CACHE_TTL_MS = 5 * 60 * 1000; // 5분
   let dryRunStatus = { state: 'idle', message: '' }; // idle | pending | ok | fail
   let dryRunTimer = null;
   let dryRunSeq = 0;
 
   function dryRunKey() {
     return `${nameEl.value.trim()}|${emailEl.value.trim().toLowerCase()}`;
+  }
+
+  function getDryRunCache(key) {
+    if (!dryRunCache.has(key)) return null;
+    const cached = dryRunCache.get(key);
+    if (cached.cachedAt && Date.now() - cached.cachedAt > DRYRUN_CACHE_TTL_MS) {
+      dryRunCache.delete(key);
+      return null;
+    }
+    return cached;
   }
 
   async function runDryRun() {
@@ -148,8 +159,8 @@
       return;
     }
     const key = dryRunKey();
-    if (dryRunCache.has(key)) {
-      const cached = dryRunCache.get(key);
+    const cached = getDryRunCache(key);
+    if (cached) {
       dryRunStatus = cached;
       renderFieldStatus();
       updateSubmitState();
@@ -169,7 +180,7 @@
       const data = await resp.json();
       if (mySeq !== dryRunSeq) return; // 최신 요청만 반영
       if (resp.ok) {
-        const result = { state: 'ok', message: '', employee: { id: data.employeeId, name: data.name, department: data.department, remaining: data.remaining, total: data.total } };
+        const result = { state: 'ok', message: '', employee: { id: data.employeeId, name: data.name, department: data.department, remaining: data.remaining, total: data.total }, cachedAt: Date.now() };
         dryRunCache.set(key, result);
         dryRunStatus = result;
       } else {
@@ -180,7 +191,7 @@
         } else if (resp.status === 403 && /이름과 이메일이 일치하지/.test(data.error || '')) {
           userMsg = '이메일은 등록되어 있지만 이름이 다릅니다. 회사 등록 이름(공백·받침 포함)으로 정확히 입력하세요.';
         }
-        const result = { state: 'fail', message: userMsg, httpStatus: resp.status };
+        const result = { state: 'fail', message: userMsg, httpStatus: resp.status, cachedAt: Date.now() };
         dryRunCache.set(key, result);
         dryRunStatus = result;
       }
@@ -515,6 +526,14 @@
       else if (dryRunStatus.state !== 'ok') reasons.push('직원 정보 미확인');
     }
 
+    // 잔여 연차 사전 검증 (클라이언트 측 — 서버에서도 재검증)
+    if (dryRunStatus.state === 'ok' &&
+        dryRunStatus.employee &&
+        dryRunStatus.employee.remaining != null &&
+        totalDays > dryRunStatus.employee.remaining) {
+      reasons.push(`잔여 부족 (잔여 ${dryRunStatus.employee.remaining}일, 신청 ${totalDays}일)`);
+    }
+
     return reasons;
   }
 
@@ -559,6 +578,7 @@
     scheduleDryRun();
   });
   // 입력 즉시 저장: 동의 체크박스 ✓ + 이름·이메일 모두 입력된 상태에서 blur 시
+  const REMEMBER_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30일
   function saveRememberedUserNow() {
     try {
       const rememberEl = document.getElementById('rememberMe');
@@ -567,9 +587,11 @@
       if (rememberEl && rememberEl.checked && n && e) {
         localStorage.setItem('eyepop-leave-remember-name', n);
         localStorage.setItem('eyepop-leave-remember-email', e);
+        localStorage.setItem('eyepop-leave-remember-expires', String(Date.now() + REMEMBER_TTL_MS));
       } else {
         localStorage.removeItem('eyepop-leave-remember-name');
         localStorage.removeItem('eyepop-leave-remember-email');
+        localStorage.removeItem('eyepop-leave-remember-expires');
       }
     } catch (e) { /* localStorage 차단 환경 무시 */ }
   }
@@ -610,6 +632,7 @@
         else if (reasons.includes('시작일 미선택') || reasons.includes('시작일이 과거 날짜')) target = startEl;
         else if (reasons.includes('종료일 미선택')) target = endEl;
         else if (reasons.includes('사용 내역 미선택') || reasons.includes('시간 입력 미완료') || reasons.includes('시간-휴가 정합성 불일치')) target = entriesList;
+        else if (reasons.some(r => r.startsWith('잔여 부족'))) target = entriesList;
         else if (reasons.includes('사유 미선택')) target = reasonEl;
 
         if (target) {
@@ -681,15 +704,17 @@
       successBox.style.display = 'block';
       successBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
       if (window.EYEPOP && EYEPOP.toast) EYEPOP.toast('신청 완료', 'success');
-      // 동의 체크박스 따라 localStorage 저장/제거
+      // 동의 체크박스 따라 localStorage 저장/제거 (30일 만료)
       try {
         const rememberEl = document.getElementById('rememberMe');
         if (rememberEl && rememberEl.checked) {
           localStorage.setItem('eyepop-leave-remember-name', payload.name);
           localStorage.setItem('eyepop-leave-remember-email', payload.email);
+          localStorage.setItem('eyepop-leave-remember-expires', String(Date.now() + REMEMBER_TTL_MS));
         } else {
           localStorage.removeItem('eyepop-leave-remember-name');
           localStorage.removeItem('eyepop-leave-remember-email');
+          localStorage.removeItem('eyepop-leave-remember-expires');
         }
       } catch (e) { /* localStorage 차단 환경 무시 */ }
       showMailCheckModal();
@@ -734,6 +759,16 @@
         document.removeEventListener('keydown', onKey);
       };
     }
+    // 배경(overlay) 클릭 시 닫기 — modal-box 내부 클릭은 영향 없음
+    const onOverlayClick = (ev) => {
+      if (ev.target === modal) {
+        clearInterval(timer);
+        modal.style.display = 'none';
+        document.removeEventListener('keydown', onKey);
+        modal.removeEventListener('click', onOverlayClick);
+      }
+    };
+    modal.addEventListener('click', onOverlayClick);
   }
 
   // 시작일 기본값: 오늘 (단, 16시 이후엔 내일)
@@ -749,9 +784,16 @@
     rebuildEntries();
   })();
 
-  // 저장된 이름·이메일 자동 채움 + 동의 체크박스 ON + dryRun 자동 호출
+  // 저장된 이름·이메일 자동 채움 + 동의 체크박스 ON + dryRun 자동 호출 (30일 만료)
   (function loadRememberedUser() {
     try {
+      const exp = Number(localStorage.getItem('eyepop-leave-remember-expires') || 0);
+      if (exp && Date.now() > exp) {
+        localStorage.removeItem('eyepop-leave-remember-name');
+        localStorage.removeItem('eyepop-leave-remember-email');
+        localStorage.removeItem('eyepop-leave-remember-expires');
+        return;
+      }
       const savedName = localStorage.getItem('eyepop-leave-remember-name');
       const savedEmail = localStorage.getItem('eyepop-leave-remember-email');
       const rememberEl = document.getElementById('rememberMe');

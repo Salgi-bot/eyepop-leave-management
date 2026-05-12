@@ -4,6 +4,24 @@
   // 세션 체크
   if (!EYEPOP.requireAdminSession()) return;
 
+  // ── 관리자 키 헬퍼 (24시간 만료) ──
+  const ADMIN_KEY_TTL_MS = 24 * 60 * 60 * 1000;
+  function getAdminKey() {
+    const key = localStorage.getItem('eyepop-admin-key');
+    const exp = Number(localStorage.getItem('eyepop-admin-key-expires') || 0);
+    if (!key) return null;
+    if (exp && Date.now() > exp) {
+      localStorage.removeItem('eyepop-admin-key');
+      localStorage.removeItem('eyepop-admin-key-expires');
+      return null;
+    }
+    return key;
+  }
+  function setAdminKey(key) {
+    localStorage.setItem('eyepop-admin-key', key);
+    localStorage.setItem('eyepop-admin-key-expires', String(Date.now() + ADMIN_KEY_TTL_MS));
+  }
+
   const state = {
     employees: [],
     requests: [],
@@ -566,7 +584,8 @@
     if (!r) return;
     if (!confirm(`${r.employeeName}님 ${r.startDate}~${r.endDate} (${r.days}일) 연차를 승인하시겠습니까?\n\n신청자에게 승인 알림 메일이 발송됩니다.`)) return;
     try {
-      const adminKey = localStorage.getItem('eyepop-admin-key');
+      const adminKey = getAdminKey();
+      if (!adminKey) { alert('관리자 세션이 만료되었습니다. 다시 로그인하세요.'); location.href = '/admin-login.html'; return; }
       const resp = await fetch('/api/approve-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
@@ -591,7 +610,8 @@
       return;
     }
     try {
-      const adminKey = localStorage.getItem('eyepop-admin-key');
+      const adminKey = getAdminKey();
+      if (!adminKey) { alert('관리자 세션이 만료되었습니다. 다시 로그인하세요.'); location.href = '/admin-login.html'; return; }
       const resp = await fetch('/api/reject-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
@@ -609,7 +629,8 @@
 
   // ── 관리자 액션 통합 호출 (delete/revert) — 직원 + 팀장 CC 메일 자동 발송 ──
   async function callManageAPI(action, requestId) {
-    const adminKey = localStorage.getItem('eyepop-admin-key');
+    const adminKey = getAdminKey();
+    if (!adminKey) { alert('관리자 세션이 만료되었습니다. 다시 로그인하세요.'); location.href = '/admin-login.html'; throw new Error('관리자 세션 만료'); }
     const resp = await fetch('/api/manage-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
@@ -783,7 +804,8 @@
     const phaseLabel = phase === 'first' ? '1차 통지' : '2차 통지';
     if (!confirm(`${ids.length}명에게 ${phaseLabel} 메일을 발송합니다.\n\n근로기준법 제61조에 따른 법정 통지이며 3년간 보존됩니다.\n계속하시겠습니까?`)) return;
     try {
-      const adminKey = localStorage.getItem('eyepop-admin-key');
+      const adminKey = getAdminKey();
+      if (!adminKey) { alert('관리자 세션이 만료되었습니다. 다시 로그인하세요.'); location.href = '/admin-login.html'; return; }
       const resp = await fetch('/api/send-promotion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },

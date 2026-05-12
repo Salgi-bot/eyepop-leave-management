@@ -9,8 +9,11 @@ EYEPOP.gist = (function() {
 
   function getAdminKey() {
     const k = localStorage.getItem('eyepop-admin-key');
-    if (!k) {
+    const exp = Number(localStorage.getItem('eyepop-admin-key-expires') || 0);
+    if (!k || (exp && Date.now() > exp)) {
       // 세션 만료 또는 키 손실 → 로그인 페이지로 리다이렉트
+      localStorage.removeItem('eyepop-admin-key');
+      localStorage.removeItem('eyepop-admin-key-expires');
       location.href = '/admin-login.html';
       return null;
     }
@@ -36,6 +39,7 @@ EYEPOP.gist = (function() {
     if (!resp.ok) {
       if (resp.status === 401) {
         localStorage.removeItem('eyepop-admin-key');
+        localStorage.removeItem('eyepop-admin-key-expires');
       }
       throw new Error(data.error || `HTTP ${resp.status}`);
     }
@@ -46,6 +50,9 @@ EYEPOP.gist = (function() {
     read: (file) => call('gist-proxy', { action: 'read', file }),
     write: (file, content) => call('gist-proxy', { action: 'write', file, content }),
     readAll: () => call('gist-proxy', { action: 'read' }),
-    resetAdminKey: () => localStorage.removeItem('eyepop-admin-key')
+    resetAdminKey: () => {
+      localStorage.removeItem('eyepop-admin-key');
+      localStorage.removeItem('eyepop-admin-key-expires');
+    }
   };
 })();
