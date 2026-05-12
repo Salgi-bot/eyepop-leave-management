@@ -1,6 +1,8 @@
 // Vercel Edge Function — SECOM 출퇴근 대조 결과 메일 자동 발송
 // 호출 시점: admin.html 출퇴근 탭에서 엑셀 업로드 → renderAttendance() 직후
-// 발송 대상: To = settings.adminEmail (노경희 실장), Cc = settings.senderEmail (김은주 차장, 있을 때만)
+// 발송 대상: To = settings.directorEmail (노경희 실장, 기본 rkhee@eyepopeng.com)
+//          Cc = settings.adminEmail (김은주 차장, 기본 eunju@eyepopeng.com)
+// 주의: settings.adminEmail은 7개 API에서 차장 메일로 광범위하게 사용되므로 변경 금지
 // 중복 발송 방지: settings.attendanceReportHistory[].month 매칭 시 409 (force === true면 통과)
 
 export const config = { runtime: 'edge' };
@@ -39,8 +41,8 @@ export default async function handler(req) {
   }
 
   const settings = gist.settings || {};
-  const adminEmail = settings.adminEmail || 'eunju@eyepopeng.com';
-  const senderEmail = settings.senderEmail || '';
+  const directorEmail = settings.directorEmail || 'rkhee@eyepopeng.com';  // To: 노경희 실장
+  const adminEmail = settings.adminEmail || 'eunju@eyepopeng.com';        // Cc: 김은주 차장
   const history = Array.isArray(settings.attendanceReportHistory) ? settings.attendanceReportHistory : [];
 
   // 중복 발송 체크 (force === false일 때만)
@@ -79,20 +81,20 @@ export default async function handler(req) {
     });
   }
 
-  // Cc 구성
+  // Cc 구성 (차장이 실장과 같은 메일이면 Cc 생략 — 방어적)
   const ccList = [];
-  if (senderEmail && senderEmail.toLowerCase() !== adminEmail.toLowerCase()) {
-    ccList.push(senderEmail);
+  if (adminEmail && adminEmail.toLowerCase() !== directorEmail.toLowerCase()) {
+    ccList.push(adminEmail);
   }
 
   // 발송
   let mailResult;
   try {
     const sendOpts = {
-      to: adminEmail,
+      to: directorEmail,
       subject,
       html,
-      replyTo: senderEmail || adminEmail
+      replyTo: adminEmail || directorEmail
     };
     if (ccList.length > 0) sendOpts.cc = ccList;
     if (attachments.length > 0) sendOpts.attachments = attachments;
@@ -107,7 +109,7 @@ export default async function handler(req) {
     month,
     sentAt: mailResult.sentAt,
     anomalyCount,
-    recipient: adminEmail,
+    recipient: directorEmail,
     cc: ccList,
     messageId: mailResult.messageId,
     forced: !!force
@@ -134,7 +136,7 @@ export default async function handler(req) {
     month,
     sentAt: mailResult.sentAt,
     anomalyCount,
-    recipient: adminEmail,
+    recipient: directorEmail,
     cc: ccList
   });
 }
