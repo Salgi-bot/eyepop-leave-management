@@ -558,14 +558,34 @@
     updateSubmitState();
     scheduleDryRun();
   });
-  nameEl.addEventListener('blur', () => { scheduleDryRun(); });
+  // 입력 즉시 저장: 동의 체크박스 ✓ + 이름·이메일 모두 입력된 상태에서 blur 시
+  function saveRememberedUserNow() {
+    try {
+      const rememberEl = document.getElementById('rememberMe');
+      const n = nameEl.value.trim();
+      const e = emailEl.value.trim();
+      if (rememberEl && rememberEl.checked && n && e) {
+        localStorage.setItem('eyepop-leave-remember-name', n);
+        localStorage.setItem('eyepop-leave-remember-email', e);
+      } else {
+        localStorage.removeItem('eyepop-leave-remember-name');
+        localStorage.removeItem('eyepop-leave-remember-email');
+      }
+    } catch (e) { /* localStorage 차단 환경 무시 */ }
+  }
+  nameEl.addEventListener('blur', () => { scheduleDryRun(); saveRememberedUserNow(); });
   emailEl.addEventListener('input', () => {
     dryRunStatus = { state: 'idle', message: '' };
     renderFieldStatus();
     updateSubmitState();
     scheduleDryRun();
   });
-  emailEl.addEventListener('blur', () => { scheduleDryRun(); });
+  emailEl.addEventListener('blur', () => { scheduleDryRun(); saveRememberedUserNow(); });
+  // 체크박스 토글 시에도 즉시 반영 (체크 해제하면 저장값 삭제)
+  (function bindRememberToggle() {
+    const rememberEl = document.getElementById('rememberMe');
+    if (rememberEl) rememberEl.addEventListener('change', saveRememberedUserNow);
+  })();
 
   function showError(msg) {
     errorBox.textContent = msg;
