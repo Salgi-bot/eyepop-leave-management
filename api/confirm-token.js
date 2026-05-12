@@ -121,12 +121,14 @@ async function saveGistMultiple(token, gistId, filesMap) {
 }
 
 function formatKst(iso) {
+  // Vercel 서버 UTC 기준 동작 → KST(UTC+9)로 변환해 표시
   const d = new Date(iso);
-  const yy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  const yy = kst.getUTCFullYear();
+  const mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(kst.getUTCDate()).padStart(2, '0');
+  const hh = String(kst.getUTCHours()).padStart(2, '0');
+  const mi = String(kst.getUTCMinutes()).padStart(2, '0');
   return `${yy}-${mm}-${dd} ${hh}:${mi}`;
 }
 
