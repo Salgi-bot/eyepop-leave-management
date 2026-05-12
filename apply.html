@@ -77,15 +77,16 @@
           <input type="checkbox" id="verbalReportConfirmed">
           <span>팀장에게 사전 구두보고를 완료했습니다.</span>
         </label>
-        <small class="hint">임원·부사장은 해당 없음.</small>
       </div>
 
       <div id="errorBox" class="error-box" style="display:none;"></div>
 
       <div class="actions">
-        <button type="button" class="btn-secondary" onclick="location.reload()">취소</button>
         <button type="submit" id="submitBtn" class="btn-primary">신청 제출</button>
       </div>
+      <p class="notice-foot" style="margin-top:8px;">
+        ⚠ 신청 후 수신 메일의 <b>"수신 확인"</b> 버튼을 1회 <b>"반드시"</b> 클릭해주세요. 도달 사실 증명 용도입니다.
+      </p>
     </form>
 
     <div id="successBox" class="success-box" style="display:none;">
@@ -101,7 +102,6 @@
       <div class="notice-content">
         <p class="notice-lead">
           <b>시행일: 2026-05-11</b> · 전 임직원 대상<br/>
-          이번 달(4월) 연차 사용 예정자는 미리 신청 바랍니다.<br/>
           📨 신청·승인 메일은 신청자 외에 <b>김은주 차장</b>과 <b>해당 팀장님</b>에게 참조로 자동 발송됩니다.
         </p>
 
@@ -110,7 +110,7 @@
           <thead><tr><th>종류</th><th>일수</th><th>시간</th></tr></thead>
           <tbody>
             <tr><td>연차</td><td>1일</td><td>8시간</td></tr>
-            <tr><td>3/4차</td><td>0.75일</td><td>6시간</td></tr>
+            <tr><td>3/4차</td><td>0.75일</td><td>6시간 (시간 직접 입력)</td></tr>
             <tr><td>반차</td><td>0.5일</td><td>4시간 (시간 직접 입력)</td></tr>
             <tr><td>반반차</td><td>0.25일</td><td>2시간 (시간 직접 입력)</td></tr>
           </tbody>
@@ -138,9 +138,6 @@
           <li>정책·법정 통지: <b>경영기획실 노경희 실장</b></li>
         </ul>
 
-        <p class="notice-foot">
-          ⚠ 신청 후 수신 메일의 <b>"수신 확인"</b> 버튼을 1회 클릭해주세요. 도달 사실 증명 용도입니다.
-        </p>
       </div>
     </section>
 
