@@ -42,6 +42,12 @@
     '반차': 240,
     '반반차': 120
   };
+  // 휴가 종류별 기본 시작시각 (어차피 임의 수정 가능)
+  const DEFAULT_START = {
+    '3/4차': '11:00',
+    '반차': '14:00',
+    '반반차': '16:00'
+  };
   // 시간 입력 필요 타입
   const NEEDS_TIME = new Set(['3/4차', '반차', '반반차']);
 
@@ -316,8 +322,11 @@
           startInput.value = '';
           endInput.value = '';
           clearEntryError(row);
-        } else if (startInput.value) {
-          // 타입 변경 시 시작시각 유지 후 종료 재계산
+        } else {
+          // 시작시각 비어 있으면 휴가 종류별 기본값 자동 입력
+          if (!startInput.value && DEFAULT_START[select.value]) {
+            startInput.value = DEFAULT_START[select.value];
+          }
           recalcEntryEnd(row);
         }
         recalcTotal();
