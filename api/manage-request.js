@@ -1,4 +1,4 @@
-// Vercel Edge Function — 관리자 액션 통합 처리 (삭제·수정·승인취소)
+// Vercel Edge Function — 관리자 액션 통합 처리 (삭제·승인취소)
 // 모든 액션 직원 To, 관리자(김은주) + 팀장 CC 메일 발송
 export const config = { runtime: 'edge' };
 
@@ -21,10 +21,10 @@ export default async function handler(req) {
 
   let body;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
-  const { action, requestId, changes } = body;
+  const { action, requestId } = body;
 
-  if (!['delete', 'edit', 'revert'].includes(action)) {
-    return json({ error: 'action은 delete | edit | revert' }, 400);
+  if (!['delete', 'revert'].includes(action)) {
+    return json({ error: 'action은 delete | revert' }, 400);
   }
   if (!requestId) return json({ error: 'requestId required' }, 400);
 
@@ -60,28 +60,6 @@ export default async function handler(req) {
     savedItem = reqItem;
     subject = `[연차 승인 취소] ${reqItem.employeeName} ${reqItem.startDate}~${reqItem.endDate}`;
     html = renderRevertMail(reqItem);
-  } else if (action === 'edit') {
-    const allowed = ['reason', 'leaveType', 'status', 'rejectReason'];
-    const applied = {};
-    for (const k of allowed) {
-      if (changes && Object.prototype.hasOwnProperty.call(changes, k)) {
-        applied[k] = changes[k];
-        reqItem[k] = changes[k];
-      }
-    }
-    // 상태 변경 시 부속 필드 자동 보정
-    if (applied.status === 'approved' || applied.status === 'auto_approved') {
-      if (!reqItem.approvedAt) reqItem.approvedAt = new Date().toISOString();
-      if (!reqItem.approvedBy) reqItem.approvedBy = 'admin-edit';
-    } else if (applied.status === 'pending') {
-      reqItem.approvedAt = null;
-      reqItem.approvedBy = null;
-    } else if (applied.status === 'rejected') {
-      if (!reqItem.rejectedAt) reqItem.rejectedAt = new Date().toISOString();
-    }
-    savedItem = reqItem;
-    subject = `[연차 신청 수정] ${reqItem.employeeName} ${reqItem.startDate}~${reqItem.endDate}`;
-    html = renderEditMail(before, reqItem, applied);
   }
 
   requestsData.updatedAt = new Date().toISOString();
@@ -168,42 +146,6 @@ function renderRevertMail(req) {
     <p style="background:#fff7e6; border-left:3px solid #c97a1a; padding:10px 14px; border-radius:4px;">
       관리자가 재검토 후 다시 처리할 예정입니다.<br/>
       문의는 경영기획실 김은주 차장에게 연락 주세요.
-    </p>
-    <hr style="border:none; border-top:1px solid #eee; margin:24px 0;"/>
-    <p style="font-size:12px; color:#999;">EYEPOP 연차관리 시스템 · 자동 발송 · 회신 불가</p>
-  </div>`;
-}
-
-function renderEditMail(before, after, applied) {
-  const changeRows = Object.keys(applied).map(k => {
-    const labelMap = { reason: '사유', leaveType: '종류', status: '상태', rejectReason: '반려 사유' };
-    const beforeVal = k === 'status' ? statusLabel(before[k]) : (before[k] || '-');
-    const afterVal = k === 'status' ? statusLabel(after[k]) : (after[k] || '-');
-    return `<tr>
-      <td style="padding:6px 10px; background:#f5f7fa; border:1px solid #e0e6ee;">${labelMap[k] || k}</td>
-      <td style="padding:6px 10px; border:1px solid #e0e6ee; color:#999; text-decoration:line-through;">${escapeHtml(String(beforeVal))}</td>
-      <td style="padding:6px 10px; border:1px solid #e0e6ee; color:#1a73e8; font-weight:600;">${escapeHtml(String(afterVal))}</td>
-    </tr>`;
-  }).join('');
-  return `
-  <div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif; line-height:1.7; max-width:640px;">
-    <h2 style="border-bottom:2px solid #1a73e8; color:#1a73e8; padding-bottom:8px;">연차 신청이 수정되었습니다</h2>
-    <p>${escapeHtml(after.employeeName)}님,</p>
-    <p>아래 연차 신청 정보가 관리자에 의해 <b>수정</b>되었습니다.</p>
-    <table style="border-collapse:collapse; margin:12px 0; font-size:13px; width:100%;">
-      <tr><td style="padding:6px; background:#f5f7fa; width:120px;">기간</td><td style="padding:6px;">${escapeHtml(after.startDate)} ~ ${escapeHtml(after.endDate)} (${after.days}일)</td></tr>
-    </table>
-    <h3 style="font-size:14px; margin:18px 0 6px;">📝 변경 내역</h3>
-    <table style="border-collapse:collapse; font-size:13px; width:100%;">
-      <thead><tr>
-        <th style="padding:8px; background:#eef3f9; border:1px solid #e0e6ee;">항목</th>
-        <th style="padding:8px; background:#eef3f9; border:1px solid #e0e6ee;">변경 전</th>
-        <th style="padding:8px; background:#eef3f9; border:1px solid #e0e6ee;">변경 후</th>
-      </tr></thead>
-      <tbody>${changeRows}</tbody>
-    </table>
-    <p style="background:#e8f0fb; border-left:3px solid #1a73e8; padding:10px 14px; border-radius:4px; margin-top:16px;">
-      변경 사항이 잘못되었거나 이의가 있으시면 즉시 경영기획실 김은주 차장에게 연락 주세요.
     </p>
     <hr style="border:none; border-top:1px solid #eee; margin:24px 0;"/>
     <p style="font-size:12px; color:#999;">EYEPOP 연차관리 시스템 · 자동 발송 · 회신 불가</p>

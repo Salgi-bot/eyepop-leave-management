@@ -525,7 +525,6 @@
         if (r.status === 'rejected') {
           btns.push(`<span style="font-size:11px; color:#b93a3a;" title="${EYEPOP.escapeHtml(r.rejectReason || '')}">사유 보기</span>`);
         }
-        btns.push(`<button class="btn-secondary btn-sm" onclick="__editRequest('${r.id}')">수정</button>`);
         btns.push(`<button class="btn-danger btn-sm" onclick="__deleteRequest('${r.id}')">삭제</button>`);
         return btns.join(' ');
       })();
@@ -608,13 +607,13 @@
   }
   window.__rejectRequest = rejectRequest;
 
-  // ── 관리자 액션 통합 호출 (delete/edit/revert) — 직원 + 팀장 CC 메일 자동 발송 ──
-  async function callManageAPI(action, requestId, changes) {
+  // ── 관리자 액션 통합 호출 (delete/revert) — 직원 + 팀장 CC 메일 자동 발송 ──
+  async function callManageAPI(action, requestId) {
     const adminKey = localStorage.getItem('eyepop-admin-key');
     const resp = await fetch('/api/manage-request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
-      body: JSON.stringify({ action, requestId, changes })
+      body: JSON.stringify({ action, requestId })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -654,70 +653,6 @@
     }
   }
   window.__revertApproval = revertApproval;
-
-  // ── 신청 내용 수정 (사유·종류·상태) ──
-  const editRequestModal = document.getElementById('editRequestModal');
-  const editRequestForm = document.getElementById('editRequestForm');
-
-  editRequestModal.addEventListener('click', (e) => {
-    if (e.target.dataset.closeReq === '1') closeEditRequestModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !editRequestModal.classList.contains('hidden')) closeEditRequestModal();
-  });
-
-  function closeEditRequestModal() {
-    editRequestModal.classList.add('hidden');
-  }
-
-  function editRequest(id) {
-    const r = state.requests.find(x => x.id === id);
-    if (!r) return;
-    document.getElementById('editReq-id').value = r.id;
-    document.getElementById('editReq-info').textContent = `${r.employeeName} (${r.department || '-'})`;
-    document.getElementById('editReq-period').textContent = `${r.startDate} ~ ${r.endDate} · ${r.days}일`;
-    document.getElementById('editReq-leaveType').value = r.leaveType || '';
-    document.getElementById('editReq-status').value = r.status || 'pending';
-    document.getElementById('editReq-reason').value = r.reason || '';
-    document.getElementById('editReq-rejectReason').value = r.rejectReason || '';
-    editRequestModal.classList.remove('hidden');
-  }
-  window.__editRequest = editRequest;
-
-  editRequestForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('editReq-id').value;
-    const r = state.requests.find(x => x.id === id);
-    if (!r) return;
-    const newReason = document.getElementById('editReq-reason').value.trim();
-    const newType = document.getElementById('editReq-leaveType').value.trim();
-    const newStatus = document.getElementById('editReq-status').value;
-    const newRejectReason = document.getElementById('editReq-rejectReason').value.trim();
-    if (newReason.length < 2) {
-      EYEPOP.toast('사유는 2자 이상', 'warning');
-      return;
-    }
-    // 변경된 항목만 changes에 담아 서버 API에 전송 (메일 자동 발송 + 팀장 CC)
-    const changes = {};
-    if (newReason !== (r.reason || '')) changes.reason = newReason;
-    if (newType && newType !== (r.leaveType || '')) changes.leaveType = newType;
-    if (newStatus !== r.status) changes.status = newStatus;
-    if (newStatus === 'rejected' && newRejectReason && newRejectReason !== (r.rejectReason || '')) {
-      changes.rejectReason = newRejectReason;
-    }
-    if (Object.keys(changes).length === 0) {
-      EYEPOP.toast('변경된 내용이 없습니다', 'warning');
-      return;
-    }
-    try {
-      await callManageAPI('edit', id, changes);
-      closeEditRequestModal();
-      await loadAll();
-      EYEPOP.toast('수정 완료 (메일 발송됨)', 'success');
-    } catch (err) {
-      EYEPOP.toast('수정 실패: ' + err.message, 'error', 5000);
-    }
-  });
 
   const STATUS_LABEL_TEXT = {
     pending: '대기',
@@ -938,6 +873,11 @@
       compareAttendance();
       renderAttendance();
       fileAttendance.value = '';
+
+      // SECOM 엑셀 업로드 시에만 노경희 실장에게 결과 자동 발송 (반반차/외출복귀 업로드는 제외)
+      if (isSecomExcel) {
+        sendAttendanceReport().catch(err => console.error('실장 메일 발송 실패:', err));
+      }
     } catch (err) {
       console.error(err);
       EYEPOP.toast('엑셀 파싱 실패: ' + err.message, 'error');
@@ -1375,12 +1315,8 @@
     EYEPOP.toast('화면 초기화 완료 (서버 데이터 유지)', 'success');
   }
 
-  function downloadAttendanceResult() {
-    const compared = state.attendance.compared;
-    if (compared.length === 0) {
-      EYEPOP.toast('대조 결과가 없습니다', 'warning');
-      return;
-    }
+  // 대조 결과 → XLSX 워크북 생성 (다운로드/메일 첨부 공용)
+  function buildAttendanceWorkbook(compared) {
     const headers = ['날짜', '이름', '부서', '출근시간', '퇴근시간', '실근무', '연차신청', '신청상태', '판정'];
     const aoa = [headers, ...compared.map(c => [
       c.date, c.name, c.dept, c.startTime, c.endTime, c.actualWorkDisplay || c.actualWork,
@@ -1390,8 +1326,64 @@
     ws['!cols'] = headers.map(h => ({ wch: h.length < 8 ? 12 : 18 }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '출퇴근대조');
+    return wb;
+  }
+
+  function downloadAttendanceResult() {
+    const compared = state.attendance.compared;
+    if (compared.length === 0) {
+      EYEPOP.toast('대조 결과가 없습니다', 'warning');
+      return;
+    }
+    const wb = buildAttendanceWorkbook(compared);
     const ymd = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `eyepop-출퇴근대조-${ymd}.xlsx`);
+  }
+
+  // SECOM 대조 결과 자동 메일 발송 (노경희 실장 To, 김은주 차장 Cc)
+  // 호출 시점: handleAttendanceUpload 안에서 compareAttendance() + renderAttendance() 직후
+  async function sendAttendanceReport({ force = false } = {}) {
+    const compared = state.attendance.compared;
+    if (!compared || compared.length === 0) return;
+
+    // month = compared 중 가장 최근 date의 YYYY-MM
+    const latestDate = compared.reduce((max, c) => (c.date && c.date > max ? c.date : max), '');
+    const month = (latestDate || '').slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      EYEPOP.toast('대조 결과에 유효한 날짜가 없어 메일 발송 불가', 'warning');
+      return;
+    }
+
+    // 엑셀 → base64
+    let excelBase64;
+    try {
+      const wb = buildAttendanceWorkbook(compared);
+      excelBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+    } catch (err) {
+      EYEPOP.toast('엑셀 생성 실패: ' + err.message, 'error', 5000);
+      return;
+    }
+
+    const adminKey = localStorage.getItem('eyepop-admin-key');
+    try {
+      const resp = await fetch('/api/send-attendance-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey },
+        body: JSON.stringify({ month, compared, excelBase64, force })
+      });
+      const data = await resp.json();
+      if (resp.status === 409) {
+        const sentAt = (data.sentAt || '').replace('T', ' ').slice(0, 16);
+        if (confirm(`${month}월 결과가 이미 발송되었습니다 (${sentAt}, 이상 ${data.anomalyCount}건).\n재발송할까요?`)) {
+          await sendAttendanceReport({ force: true });
+        }
+        return;
+      }
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      EYEPOP.toast('실장 메일 발송 완료', 'success');
+    } catch (err) {
+      EYEPOP.toast('발송 실패: ' + err.message, 'error', 5000);
+    }
   }
 
   // ── 초기 로드 ──
