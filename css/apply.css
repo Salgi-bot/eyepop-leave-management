@@ -211,9 +211,124 @@
   margin-left: auto;
 }
 
+.entry-time-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.entry-time-wrap .entry-time-start,
+.entry-time-wrap .entry-time-end {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 5px;
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+}
+.entry-time-wrap .entry-time-end {
+  background: #f5f7fa;
+  color: #444;
+}
+.entry-time-sep {
+  color: var(--gray-400);
+  font-size: 13px;
+}
+.entry-error {
+  grid-column: 1 / -1;
+  background: #fde8e8;
+  color: var(--danger);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border-left: 2px solid var(--danger);
+  margin-top: 4px;
+}
+.entry-row-error {
+  border: 1px solid var(--danger);
+}
+
 @media (max-width: 480px) {
   .entry-row { grid-template-columns: 80px 1fr; }
-  .entry-row .entry-time { grid-column: 1 / -1; }
+  .entry-row .entry-time-wrap { grid-column: 1 / -1; }
+  .entry-row .entry-error { grid-column: 1 / -1; }
+}
+
+/* 사전검증 (dryRun) 메시지 */
+.dryrun-msg {
+  margin-top: 6px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.dryrun-msg.dryrun-ok {
+  background: #e6f4ea;
+  color: #1e5631;
+  border-left: 3px solid #2e7d4f;
+}
+.dryrun-msg.dryrun-fail {
+  background: #fde8e8;
+  color: #6a2222;
+  border-left: 3px solid var(--danger);
+}
+.dryrun-msg.dryrun-pending {
+  background: #f5f7fa;
+  color: #555;
+  border-left: 3px solid #bbb;
+}
+
+/* 필드 ✓/❌ 아이콘 (input 우측 표시) */
+.apply-form input.field-ok {
+  border-color: #2e7d4f;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><path fill='%232e7d4f' d='M6.5 11.5L3 8l1-1 2.5 2.5L12 4l1 1z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+}
+.apply-form input.field-fail {
+  border-color: var(--danger);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><path fill='%23b93a3a' d='M4 4l8 8M12 4l-8 8' stroke='%23b93a3a' stroke-width='2'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 32px;
+}
+
+/* 제출 버튼 비활성 + tooltip */
+.btn-primary.btn-disabled {
+  background: #c6cbd2 !important;
+  cursor: not-allowed;
+  position: relative;
+}
+.btn-primary.btn-disabled[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: #b93a3a;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  max-width: 320px;
+  width: max-content;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 10;
+  pointer-events: none;
+  text-align: left;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.btn-primary.btn-disabled[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  right: 16px;
+  border: 6px solid transparent;
+  border-top-color: #b93a3a;
+  z-index: 10;
 }
 
 /* 이용 안내 접이식 박스 */

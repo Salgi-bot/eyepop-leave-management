@@ -32,6 +32,7 @@
         <label for="email">이메일 <span class="req">*</span></label>
         <input type="email" id="email" required autocomplete="email" placeholder="gildong@hanmail.net">
         <small class="hint">회사의 공식 이메일을 입력해주세요. (관리자에게 사전 등록되어 있어야 합니다)</small>
+        <div id="dryRunMsg" class="dryrun-msg" style="display:none;"></div>
       </div>
 
       <div class="row-2col">
@@ -48,7 +49,7 @@
       <div class="row" id="entriesSection" style="display:none;">
         <label>일자별 사용 내역 <span class="req">*</span></label>
         <div id="entriesList" class="entries-list"></div>
-        <small class="hint">각 날짜의 종류를 선택하세요. <b>반반차</b>는 시간 입력 (예: <code>13:00~15:00</code>).</small>
+        <small class="hint">각 날짜의 종류를 선택하세요. <b>3/4차·반차·반반차</b>는 시작시각만 입력하면 종료시각이 자동 계산됩니다. (점심 11:45~12:45 자동 제외)</small>
       </div>
 
       <div class="row" id="totalRow" style="display:none;">
@@ -115,10 +116,11 @@
             <tr><td>반반차</td><td>0.25일</td><td>2시간 (시간 직접 입력)</td></tr>
           </tbody>
         </table>
-        <p class="notice-tip">💡 반차는 4시간 한정으로 사용 시간을 자유롭게 지정할 수 있습니다.<br/>
-          · 오전 반차 표준: <b>09:00~14:00</b> (점심 12:00~13:00 제외 = 4시간 사용)<br/>
-          · 오후 반차 표준: <b>14:00~18:00</b><br/>
-          · 그 외 시간 가능 (예: 10:00~15:00, 점심 1시간 제외 4시간 사용)</p>
+        <p class="notice-tip">💡 사용 시간을 기준에 맞게 임의 지정할 수 있습니다. (점심시간 11:45~12:45 자동 제외)<br/>
+          · 3/4차 (6시간) 예: <b>09:00~16:00</b> / <b>11:00~18:00</b><br/>
+          · 반차 (4시간) 예: <b>09:00~14:00</b> / <b>14:00~18:00</b><br/>
+          · 반반차 (2시간) 예: <b>09:00~11:00</b> / <b>11:00~14:00</b> / <b>14:00~16:00</b> / <b>16:00~18:00</b><br/>
+          · 그 외 시간 자유 지정 가능 (예: 반차 10:00~15:00)</p>
 
         <h4>❓ 자주 묻는 질문</h4>
         <dl class="notice-faq">

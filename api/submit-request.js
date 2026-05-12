@@ -25,7 +25,38 @@ export default async function handler(req) {
     return json({ error: 'Invalid JSON' }, 400);
   }
 
-  const { name, email, startDate, endDate, days, entries, leaveType, reason, verbalReportConfirmed } = body;
+  const { name, email, startDate, endDate, days, entries, leaveType, reason, verbalReportConfirmed, dryRun } = body;
+
+  // ─────────── dryRun: 직원 매칭만 검증 ───────────
+  if (dryRun) {
+    if (!name || !email) {
+      return json({ error: '이름·이메일을 입력하세요.' }, 400);
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return json({ error: '이메일 형식이 올바르지 않습니다.' }, 400);
+    }
+    let gistDry;
+    try {
+      gistDry = await loadGist(token, gistId);
+    } catch (err) {
+      return json({ error: 'Gist load failed', detail: err.message }, 500);
+    }
+    const employeesDry = gistDry.employees?.employees || [];
+    const employeeDry = employeesDry.find(e => e.email?.toLowerCase() === email.toLowerCase());
+    if (!employeeDry) {
+      return json({ error: '등록되지 않은 직원입니다. 관리자에게 문의하세요.' }, 403);
+    }
+    if (employeeDry.name && employeeDry.name !== name) {
+      return json({ error: '이름과 이메일이 일치하지 않습니다.' }, 403);
+    }
+    return json({
+      ok: true,
+      employeeId: employeeDry.id,
+      name: employeeDry.name,
+      department: employeeDry.department || ''
+    }, 200);
+  }
+
   if (!reason || reason.trim().length < 2) {
     return json({ error: '사유는 필수 입력입니다. (2자 이상)' }, 400);
   }
@@ -43,7 +74,7 @@ export default async function handler(req) {
   // entries 검증 + 서버에서 days 재계산 (클라이언트 신뢰 X)
   // '반차' = 신규 통합 옵션, '오전반차'/'오후반차' = 기존 데이터 호환
   const TYPE_DAYS = { '연차': 1, '3/4차': 0.75, '반차': 0.5, '오전반차': 0.5, '오후반차': 0.5, '반반차': 0.25 };
-  const NEEDS_TIME = new Set(['반차', '반반차']);
+  const NEEDS_TIME = new Set(['3/4차', '반차', '반반차']);
   if (!Array.isArray(entries) || entries.length === 0) {
     return json({ error: 'entries 배열이 비어 있습니다.' }, 400);
   }
