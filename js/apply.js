@@ -474,7 +474,6 @@
     if (!startEl.value) reasons.push('시작일 미선택');
     if (!endEl.value) reasons.push('종료일 미선택');
     if (!reasonEl.value) reasons.push('사유 미선택');
-    else if (reasonEl.value === '기타' && !reasonEtcEl.value.trim()) reasons.push('기타 상세 미입력');
 
     // entries 검증
     const entries = (entriesList && entriesList.children.length > 0) ? getEntries() : [];
@@ -533,10 +532,8 @@
   reasonEl.addEventListener('change', () => {
     if (reasonEl.value === '기타') {
       reasonEtcEl.style.display = 'block';
-      reasonEtcEl.required = true;
     } else {
       reasonEtcEl.style.display = 'none';
-      reasonEtcEl.required = false;
       reasonEtcEl.value = '';
     }
     updateSubmitState();
@@ -582,7 +579,7 @@
         else if (reasons.includes('시작일 미선택')) target = startEl;
         else if (reasons.includes('종료일 미선택')) target = endEl;
         else if (reasons.includes('사용 내역 미선택') || reasons.includes('시간 입력 미완료') || reasons.includes('시간-휴가 정합성 불일치')) target = entriesList;
-        else if (reasons.includes('사유 미선택') || reasons.includes('기타 상세 미입력')) target = reasonEl;
+        else if (reasons.includes('사유 미선택')) target = reasonEl;
 
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'center' });
